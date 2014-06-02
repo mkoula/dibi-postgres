@@ -83,7 +83,7 @@ class DibiConnection extends DibiObject
 		$class = preg_replace(array('#\W#', '#sql#'), array('_', 'Sql'), ucfirst(strtolower($config['driver'])));
 		$class = "Dibi{$class}Driver";
 		if (!class_exists($class)) {
-			include_once dirname(__FILE__) . "/../drivers/$class.php";
+			include_once __DIR__ . "/../drivers/$class.php";
 
 			if (!class_exists($class, FALSE)) {
 				throw new DibiException("Unable to create instance of dibi driver '$class'.");

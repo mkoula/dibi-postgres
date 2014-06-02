@@ -6,8 +6,8 @@
  */
 
 
-require_once dirname(__FILE__) . '/DibiMySqlReflector.php';
-require_once dirname(__FILE__) . '/DibiSqliteReflector.php';
+require_once __DIR__ . '/DibiMySqlReflector.php';
+require_once __DIR__ . '/DibiSqliteReflector.php';
 
 
 /**
@@ -470,8 +470,6 @@ class DibiPdoDriver extends DibiObject implements IDibiDriver, IDibiResultDriver
 			if ($row === FALSE) {
 				throw new DibiNotSupportedException('Driver does not support meta data.');
 			}
-			// PHP < 5.2.3 compatibility
-			// @see: http://php.net/manual/en/pdostatement.getcolumnmeta.php#pdostatement.getcolumnmeta.changelog
 			$row = $row + array(
 				'table' => NULL,
 				'native_type' => 'VAR_STRING',

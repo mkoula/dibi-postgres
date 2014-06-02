@@ -6,7 +6,7 @@
  */
 
 
-require_once dirname(__FILE__) . '/DibiMsSql2005Reflector.php';
+require_once __DIR__ . '/DibiMsSql2005Reflector.php';
 
 
 /**
