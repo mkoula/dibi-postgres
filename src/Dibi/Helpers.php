@@ -184,8 +184,7 @@ class Helpers
 	public static function detectType($type)
 	{
 		static $patterns = [
-			'^(_INT4|_INT2|_INT8|_CHAR|_VARCHAR|_TEXT)' => Type::ARRAY_TYPE,
-			'^_' => Type::TEXT, // PostgreSQL arrays
+			'^_' => Type::ARRAY_TYPE, // PostgreSQL arrays
 			'BYTEA|BLOB|BIN' => Type::BINARY,
 			'TEXT|CHAR|POINT|INTERVAL|STRING' => Type::TEXT,
 			'YEAR|BYTE|COUNTER|SERIAL|INT|LONG|SHORT|^TINY$' => Type::INTEGER,
