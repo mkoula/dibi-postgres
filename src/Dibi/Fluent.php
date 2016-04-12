@@ -225,6 +225,21 @@ class Fluent implements IDataSource
 
 
 	/**
+	 * Gets a clause
+	 * @param string clause name
+	 * @return NULL
+	 */
+	public function getClause($clause)
+	{
+		if (isset($this->clauses[self::$normalizer->$clause])) {
+			return $this->clauses[self::$normalizer->$clause];
+		}
+
+		return NULL;
+	}
+
+
+	/**
 	 * Removes a clause.
 	 * @param  string clause name
 	 * @return self
