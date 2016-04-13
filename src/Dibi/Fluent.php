@@ -227,7 +227,7 @@ class Fluent implements IDataSource
 	/**
 	 * Gets a clause
 	 * @param string clause name
-	 * @return NULL
+	 * @return NULL|array
 	 */
 	public function getClause($clause)
 	{
