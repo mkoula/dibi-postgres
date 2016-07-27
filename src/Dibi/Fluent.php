@@ -27,6 +27,7 @@ use Dibi\Drivers\PostgreDriver;
  * @method Fluent innerJoin(...$table)
  * @method Fluent rightJoin(...$table)
  * @method Fluent outerJoin(...$table)
+ * @method Fluent as(...$field)
  * @method Fluent on(...$cond)
  * @method Fluent using(...$cond)
  * @method Fluent returning(...$field)
@@ -185,7 +186,7 @@ class Fluent implements IDataSource
 				return $this;
 
 			} elseif (is_string($arg) && preg_match('#^[a-z:_][a-z0-9_.:]*\z#i', $arg)) { // identifier
-				$args = ['%n', $arg];
+				$args = [$clause === 'AS' ? '%N' : '%n', $arg];
 
 			} elseif (is_array($arg) || ($arg instanceof \Traversable && !$arg instanceof self)) { // any array
 				if (isset(self::$modifiers[$clause])) {

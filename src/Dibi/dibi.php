@@ -22,8 +22,8 @@ class dibi
 
 	/** version */
 	const
-		VERSION = '3.0.3',
-		REVISION = 'released on 2016-02-21';
+		VERSION = '3.0.5',
+		REVISION = 'released on 2016-07-20';
 
 	/** sorting order */
 	const

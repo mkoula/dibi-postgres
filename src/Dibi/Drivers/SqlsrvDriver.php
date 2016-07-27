@@ -72,7 +72,7 @@ class SqlsrvDriver implements Dibi\Driver, Dibi\ResultDriver
 			$this->connection = $config['resource'];
 
 		} else {
-			$options = & $config['options'];
+			$options = $config['options'];
 
 			// Default values
 			if (!isset($options['CharacterSet'])) {
@@ -99,7 +99,7 @@ class SqlsrvDriver implements Dibi\Driver, Dibi\ResultDriver
 	 */
 	public function disconnect()
 	{
-		sqlsrv_close($this->connection);
+		@sqlsrv_close($this->connection); // @ - connection can be already disconnected
 	}
 
 
