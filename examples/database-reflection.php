@@ -1,10 +1,13 @@
+<?php
+declare(strict_types=1);
+?>
 <!DOCTYPE html><link rel="stylesheet" href="data/style.css">
 
 <h1>Database Reflection | dibi</h1>
 
 <?php
 
-require __DIR__ . '/../src/loader.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 
 dibi::connect([

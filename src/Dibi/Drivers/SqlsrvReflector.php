@@ -5,6 +5,8 @@
  * Copyright (c) 2005 David Grudl (https://davidgrudl.com)
  */
 
+declare(strict_types=1);
+
 namespace Dibi\Drivers;
 
 use Dibi;
@@ -30,13 +32,12 @@ class SqlsrvReflector implements Dibi\Reflector
 
 	/**
 	 * Returns list of tables.
-	 * @return array
 	 */
-	public function getTables()
+	public function getTables(): array
 	{
 		$res = $this->driver->query("SELECT TABLE_NAME, TABLE_TYPE FROM INFORMATION_SCHEMA.TABLES WHERE [TABLE_SCHEMA] = 'dbo'");
 		$tables = [];
-		while ($row = $res->fetch(FALSE)) {
+		while ($row = $res->fetch(false)) {
 			$tables[] = [
 				'name' => $row[0],
 				'view' => isset($row[1]) && $row[1] === 'VIEW',
@@ -48,10 +49,8 @@ class SqlsrvReflector implements Dibi\Reflector
 
 	/**
 	 * Returns metadata for all columns in a table.
-	 * @param  string
-	 * @return array
 	 */
-	public function getColumns($table)
+	public function getColumns(string $table): array
 	{
 		$res = $this->driver->query("
 			SELECT c.name as COLUMN_NAME, c.is_identity AS AUTO_INCREMENT
@@ -61,7 +60,7 @@ class SqlsrvReflector implements Dibi\Reflector
 		");
 
 		$autoIncrements = [];
-		while ($row = $res->fetch(TRUE)) {
+		while ($row = $res->fetch(true)) {
 			$autoIncrements[$row['COLUMN_NAME']] = (bool) $row['AUTO_INCREMENT'];
 		}
 
@@ -81,13 +80,13 @@ class SqlsrvReflector implements Dibi\Reflector
 			WHERE C.TABLE_NAME = {$this->driver->escapeText($table)}
 		");
 		$columns = [];
-		while ($row = $res->fetch(TRUE)) {
+		while ($row = $res->fetch(true)) {
 			$columns[] = [
 				'name' => $row['COLUMN_NAME'],
 				'table' => $table,
 				'nativetype' => strtoupper($row['DATA_TYPE']),
 				'size' => $row['CHARACTER_MAXIMUM_LENGTH'],
-				'unsigned' => TRUE,
+				'unsigned' => true,
 				'nullable' => $row['IS_NULLABLE'] === 'YES',
 				'default' => $row['COLUMN_DEFAULT'],
 				'autoincrement' => $autoIncrements[$row['COLUMN_NAME']],
@@ -100,24 +99,22 @@ class SqlsrvReflector implements Dibi\Reflector
 
 	/**
 	 * Returns metadata for all indexes in a table.
-	 * @param  string
-	 * @return array
 	 */
-	public function getIndexes($table)
+	public function getIndexes(string $table): array
 	{
-		$keyUsagesRes = $this->driver->query(sprintf("EXEC [sys].[sp_helpindex] @objname = N%s", $this->driver->escapeText($table)));
+		$keyUsagesRes = $this->driver->query(sprintf('EXEC [sys].[sp_helpindex] @objname = N%s', $this->driver->escapeText($table)));
 		$keyUsages = [];
-		while ($row = $keyUsagesRes->fetch(TRUE)) {
+		while ($row = $keyUsagesRes->fetch(true)) {
 			$keyUsages[$row['index_name']] = explode(',', $row['index_keys']);
 		}
 
 		$res = $this->driver->query("SELECT [i].* FROM [sys].[indexes] [i] INNER JOIN [sys].[tables] [t] ON [i].[object_id] = [t].[object_id] WHERE [t].[name] = {$this->driver->escapeText($table)}");
 		$indexes = [];
-		while ($row = $res->fetch(TRUE)) {
+		while ($row = $res->fetch(true)) {
 			$indexes[$row['name']]['name'] = $row['name'];
 			$indexes[$row['name']]['unique'] = $row['is_unique'] === 1;
 			$indexes[$row['name']]['primary'] = $row['is_primary_key'] === 1;
-			$indexes[$row['name']]['columns'] = isset($keyUsages[$row['name']]) ? $keyUsages[$row['name']] : [];
+			$indexes[$row['name']]['columns'] = $keyUsages[$row['name']] ?? [];
 		}
 		return array_values($indexes);
 	}
@@ -125,12 +122,9 @@ class SqlsrvReflector implements Dibi\Reflector
 
 	/**
 	 * Returns metadata for all foreign keys in a table.
-	 * @param  string
-	 * @return array
 	 */
-	public function getForeignKeys($table)
+	public function getForeignKeys(string $table): array
 	{
 		throw new Dibi\NotImplementedException;
 	}
-
 }

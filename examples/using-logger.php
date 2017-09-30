@@ -1,10 +1,13 @@
+<?php
+declare(strict_types=1);
+?>
 <!DOCTYPE html><link rel="stylesheet" href="data/style.css">
 
 <h1>Using Logger | dibi</h1>
 
 <?php
 
-require __DIR__ . '/../src/loader.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 date_default_timezone_set('Europe/Prague');
 
@@ -14,7 +17,7 @@ dibi::connect([
 	'database' => 'data/sample.s3db',
 	// enable query logging to this file
 	'profiler' => [
-		'run' => TRUE,
+		'run' => true,
 		'file' => 'data/log.sql',
 	],
 ]);

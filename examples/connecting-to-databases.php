@@ -1,10 +1,13 @@
+<?php
+declare(strict_types=1);
+?>
 <!DOCTYPE html><link rel="stylesheet" href="data/style.css">
 
 <h1>Connecting to Databases | dibi</h1>
 
 <?php
 
-require __DIR__ . '/../src/loader.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 
 // connects to SQlite using dibi class
@@ -74,7 +77,7 @@ try {
 		'driver' => 'odbc',
 		'username' => 'root',
 		'password' => '***',
-		'dsn' => 'Driver={Microsoft Access Driver (*.mdb)};Dbq='.__DIR__.'/data/sample.mdb',
+		'dsn' => 'Driver={Microsoft Access Driver (*.mdb)};Dbq=' . __DIR__ . '/data/sample.mdb',
 	]);
 	echo 'OK';
 } catch (Dibi\Exception $e) {
@@ -89,7 +92,7 @@ try {
 	dibi::connect([
 		'driver' => 'postgre',
 		'string' => 'host=localhost port=5432 dbname=mary',
-		'persistent' => TRUE,
+		'persistent' => true,
 	]);
 	echo 'OK';
 } catch (Dibi\Exception $e) {

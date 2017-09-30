@@ -11,14 +11,14 @@
 		}
 	],
 	"require": {
-		"php": ">=5.4.4"
+		"php": ">=7.1"
 	},
 	"require-dev": {
 		"tracy/tracy": "~2.2",
-		"nette/tester": "~1.3"
+		"nette/tester": "~2.0"
 	},
 	"replace": {
-		"dg/dibi": "self.version"
+		"dg/dibi": "*"
 	},
 	"autoload": {
 		"classmap": ["src/"],
@@ -26,7 +26,7 @@
 	},
 	"extra": {
 		"branch-alias": {
-			"dev-master": "3.0-dev"
+			"dev-master": "4.0-dev"
 		}
 	}
 }

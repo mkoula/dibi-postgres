@@ -5,6 +5,8 @@
  * Copyright (c) 2005 David Grudl (https://davidgrudl.com)
  */
 
+declare(strict_types=1);
+
 namespace Dibi;
 
 
@@ -13,7 +15,6 @@ namespace Dibi;
  */
 class Row implements \ArrayAccess, \IteratorAggregate, \Countable
 {
-
 	public function __construct($arr)
 	{
 		foreach ($arr as $k => $v) {
@@ -30,20 +31,17 @@ class Row implements \ArrayAccess, \IteratorAggregate, \Countable
 
 	/**
 	 * Converts value to DateTime object.
-	 * @param  string key
-	 * @param  string format
-	 * @return \DateTime
 	 */
-	public function asDateTime($key, $format = NULL)
+	public function asDateTime(string $key, string $format = null): \DateTime
 	{
 		$time = $this[$key];
 		if (!$time instanceof DateTime) {
-			if ((int) $time === 0 && substr((string) $time, 0, 3) !== '00:') { // '', NULL, FALSE, '0000-00-00', ...
-				return NULL;
+			if (!$time || substr((string) $time, 0, 3) === '000') { // '', null, false, '0000-00-00', ...
+				return null;
 			}
 			$time = new DateTime($time);
 		}
-		return $format === NULL ? $time : $time->format($format);
+		return $format === null ? $time : $time->format($format);
 	}
 
 
@@ -91,5 +89,4 @@ class Row implements \ArrayAccess, \IteratorAggregate, \Countable
 	{
 		unset($this->$nm);
 	}
-
 }

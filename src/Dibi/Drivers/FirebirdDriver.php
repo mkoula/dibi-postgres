@@ -5,9 +5,12 @@
  * Copyright (c) 2005 David Grudl (https://davidgrudl.com)
  */
 
+declare(strict_types=1);
+
 namespace Dibi\Drivers;
 
 use Dibi;
+use Dibi\Helpers;
 
 
 /**
@@ -26,22 +29,22 @@ class FirebirdDriver implements Dibi\Driver, Dibi\ResultDriver, Dibi\Reflector
 {
 	use Dibi\Strict;
 
-	const ERROR_EXCEPTION_THROWN = -836;
+	public const ERROR_EXCEPTION_THROWN = -836;
 
-	/** @var resource  Connection resource */
+	/** @var resource|null */
 	private $connection;
 
-	/** @var resource  Resultset resource */
+	/** @var resource|null */
 	private $resultSet;
 
 	/** @var bool */
-	private $autoFree = TRUE;
+	private $autoFree = true;
 
-	/** @var resource  Resultset resource */
+	/** @var resource|null */
 	private $transaction;
 
 	/** @var bool */
-	private $inTransaction = FALSE;
+	private $inTransaction = false;
 
 
 	/**
@@ -57,12 +60,11 @@ class FirebirdDriver implements Dibi\Driver, Dibi\ResultDriver, Dibi\Reflector
 
 	/**
 	 * Connects to a database.
-	 * @return void
 	 * @throws Dibi\Exception
 	 */
-	public function connect(array & $config)
+	public function connect(array &$config): void
 	{
-		Dibi\Helpers::alias($config, 'database', 'db');
+		Helpers::alias($config, 'database', 'db');
 
 		if (isset($config['resource'])) {
 			$this->connection = $config['resource'];
@@ -78,9 +80,9 @@ class FirebirdDriver implements Dibi\Driver, Dibi\ResultDriver, Dibi\Reflector
 			];
 
 			if (empty($config['persistent'])) {
-				$this->connection = ibase_connect($config['database'], $config['username'], $config['password'], $config['charset'], $config['buffers']); // intentionally @
+				$this->connection = @ibase_connect($config['database'], $config['username'], $config['password'], $config['charset'], $config['buffers']); // intentionally @
 			} else {
-				$this->connection = ibase_pconnect($config['database'], $config['username'], $config['password'], $config['charset'], $config['buffers']); // intentionally @
+				$this->connection = @ibase_pconnect($config['database'], $config['username'], $config['password'], $config['charset'], $config['buffers']); // intentionally @
 			}
 
 			if (!is_resource($this->connection)) {
@@ -92,26 +94,23 @@ class FirebirdDriver implements Dibi\Driver, Dibi\ResultDriver, Dibi\Reflector
 
 	/**
 	 * Disconnects from a database.
-	 * @return void
 	 */
-	public function disconnect()
+	public function disconnect(): void
 	{
-		ibase_close($this->connection);
+		@ibase_close($this->connection); // @ - connection can be already disconnected
 	}
 
 
 	/**
 	 * Executes the SQL query.
-	 * @param  string      SQL statement.
-	 * @return Dibi\ResultDriver|NULL
 	 * @throws Dibi\DriverException|Dibi\Exception
 	 */
-	public function query($sql)
+	public function query(string $sql): ?Dibi\ResultDriver
 	{
 		$resource = $this->inTransaction ? $this->transaction : $this->connection;
 		$res = ibase_query($resource, $sql);
 
-		if ($res === FALSE) {
+		if ($res === false) {
 			if (ibase_errcode() == self::ERROR_EXCEPTION_THROWN) {
 				preg_match('/exception (\d+) (\w+) (.*)/i', ibase_errmsg(), $match);
 				throw new Dibi\ProcedureException($match[3], $match[1], $match[2], $sql);
@@ -123,55 +122,49 @@ class FirebirdDriver implements Dibi\Driver, Dibi\ResultDriver, Dibi\Reflector
 		} elseif (is_resource($res)) {
 			return $this->createResultDriver($res);
 		}
+		return null;
 	}
 
 
 	/**
 	 * Gets the number of affected rows by the last INSERT, UPDATE or DELETE query.
-	 * @return int|FALSE  number of rows or FALSE on error
 	 */
-	public function getAffectedRows()
+	public function getAffectedRows(): ?int
 	{
-		return ibase_affected_rows($this->connection);
+		return Helpers::false2Null(ibase_affected_rows($this->connection));
 	}
 
 
 	/**
 	 * Retrieves the ID generated for an AUTO_INCREMENT column by the previous INSERT query.
-	 * @param  string     generator name
-	 * @return int|FALSE  int on success or FALSE on failure
 	 */
-	public function getInsertId($sequence)
+	public function getInsertId(?string $sequence): ?int
 	{
-		return ibase_gen_id($sequence, 0, $this->connection);
+		return Helpers::false2Null(ibase_gen_id($sequence, 0, $this->connection));
 	}
 
 
 	/**
 	 * Begins a transaction (if supported).
-	 * @param  string  optional savepoint name
-	 * @return void
 	 * @throws Dibi\DriverException
 	 */
-	public function begin($savepoint = NULL)
+	public function begin(string $savepoint = null): void
 	{
-		if ($savepoint !== NULL) {
+		if ($savepoint !== null) {
 			throw new Dibi\NotSupportedException('Savepoints are not supported in Firebird/Interbase.');
 		}
 		$this->transaction = ibase_trans($this->getResource());
-		$this->inTransaction = TRUE;
+		$this->inTransaction = true;
 	}
 
 
 	/**
 	 * Commits statements in a transaction.
-	 * @param  string  optional savepoint name
-	 * @return void
 	 * @throws Dibi\DriverException
 	 */
-	public function commit($savepoint = NULL)
+	public function commit(string $savepoint = null): void
 	{
-		if ($savepoint !== NULL) {
+		if ($savepoint !== null) {
 			throw new Dibi\NotSupportedException('Savepoints are not supported in Firebird/Interbase.');
 		}
 
@@ -179,19 +172,17 @@ class FirebirdDriver implements Dibi\Driver, Dibi\ResultDriver, Dibi\Reflector
 			throw new Dibi\DriverException('Unable to handle operation - failure when commiting transaction.');
 		}
 
-		$this->inTransaction = FALSE;
+		$this->inTransaction = false;
 	}
 
 
 	/**
 	 * Rollback changes in a transaction.
-	 * @param  string  optional savepoint name
-	 * @return void
 	 * @throws Dibi\DriverException
 	 */
-	public function rollback($savepoint = NULL)
+	public function rollback(string $savepoint = null): void
 	{
-		if ($savepoint !== NULL) {
+		if ($savepoint !== null) {
 			throw new Dibi\NotSupportedException('Savepoints are not supported in Firebird/Interbase.');
 		}
 
@@ -199,15 +190,14 @@ class FirebirdDriver implements Dibi\Driver, Dibi\ResultDriver, Dibi\Reflector
 			throw new Dibi\DriverException('Unable to handle operation - failure when rolbacking transaction.');
 		}
 
-		$this->inTransaction = FALSE;
+		$this->inTransaction = false;
 	}
 
 
 	/**
 	 * Is in transaction?
-	 * @return bool
 	 */
-	public function inTransaction()
+	public function inTransaction(): bool
 	{
 		return $this->inTransaction;
 	}
@@ -215,19 +205,18 @@ class FirebirdDriver implements Dibi\Driver, Dibi\ResultDriver, Dibi\Reflector
 
 	/**
 	 * Returns the connection resource.
-	 * @return resource
+	 * @return resource|null
 	 */
 	public function getResource()
 	{
-		return is_resource($this->connection) ? $this->connection : NULL;
+		return is_resource($this->connection) ? $this->connection : null;
 	}
 
 
 	/**
 	 * Returns the connection reflector.
-	 * @return Dibi\Reflector
 	 */
-	public function getReflector()
+	public function getReflector(): Dibi\Reflector
 	{
 		return $this;
 	}
@@ -236,9 +225,8 @@ class FirebirdDriver implements Dibi\Driver, Dibi\ResultDriver, Dibi\Reflector
 	/**
 	 * Result set driver factory.
 	 * @param  resource
-	 * @return Dibi\ResultDriver
 	 */
-	public function createResultDriver($resource)
+	public function createResultDriver($resource): Dibi\ResultDriver
 	{
 		$res = clone $this;
 		$res->resultSet = $resource;
@@ -251,58 +239,59 @@ class FirebirdDriver implements Dibi\Driver, Dibi\ResultDriver, Dibi\Reflector
 
 	/**
 	 * Encodes data for use in a SQL statement.
-	 * @param  string
-	 * @return string
 	 */
-	public function escapeText($value)
+	public function escapeText(string $value): string
 	{
 		return "'" . str_replace("'", "''", $value) . "'";
 	}
 
 
-	public function escapeBinary($value)
+	public function escapeBinary(string $value): string
 	{
 		return "'" . str_replace("'", "''", $value) . "'";
 	}
 
 
-	public function escapeIdentifier($value)
+	public function escapeIdentifier(string $value): string
 	{
-		return '"' . str_replace('"', '""', $value). '"';
+		return '"' . str_replace('"', '""', $value) . '"';
 	}
 
 
-	public function escapeBool($value)
+	public function escapeBool(bool $value): string
 	{
-		return $value ? 1 : 0;
+		return $value ? '1' : '0';
 	}
 
 
-	public function escapeDate($value)
+	/**
+	 * @param  \DateTimeInterface|string|int
+	 */
+	public function escapeDate($value): string
 	{
-		if (!$value instanceof \DateTime && !$value instanceof \DateTimeInterface) {
+		if (!$value instanceof \DateTimeInterface) {
 			$value = new Dibi\DateTime($value);
 		}
 		return $value->format("'Y-m-d'");
 	}
 
 
-	public function escapeDateTime($value)
+	/**
+	 * @param  \DateTimeInterface|string|int
+	 */
+	public function escapeDateTime($value): string
 	{
-		if (!$value instanceof \DateTime && !$value instanceof \DateTimeInterface) {
+		if (!$value instanceof \DateTimeInterface) {
 			$value = new Dibi\DateTime($value);
 		}
-		return $value->format("'Y-m-d H:i:s'");
+		return $value->format("'Y-m-d H:i:s.u'");
 	}
 
 
 	/**
 	 * Encodes string for use in a LIKE statement.
-	 * @param  string
-	 * @param  int
-	 * @return string
 	 */
-	public function escapeLike($value, $pos)
+	public function escapeLike(string $value, int $pos): string
 	{
 		throw new Dibi\NotImplementedException;
 	}
@@ -310,32 +299,21 @@ class FirebirdDriver implements Dibi\Driver, Dibi\ResultDriver, Dibi\Reflector
 
 	/**
 	 * Decodes data from result set.
-	 * @param  string
-	 * @return string
 	 */
-	public function unescapeBinary($value)
+	public function unescapeBinary(string $value): string
 	{
 		return $value;
 	}
 
 
-	/** @deprecated */
-	public function escape($value, $type)
-	{
-		trigger_error(__METHOD__ . '() is deprecated.', E_USER_DEPRECATED);
-		return Dibi\Helpers::escape($this, $value, $type);
-	}
-
-
 	/**
 	 * Injects LIMIT/OFFSET to the SQL query.
-	 * @return void
 	 */
-	public function applyLimit(& $sql, $limit, $offset)
+	public function applyLimit(string &$sql, ?int $limit, ?int $offset): void
 	{
-		if ($limit >= 0 && $offset > 0) {
-			// see http://scott.yang.id.au/2004/01/limit-in-select-statements-in-firebird/
-			$sql = 'SELECT FIRST ' . (int) $limit . ($offset > 0 ? ' SKIP ' . (int) $offset : '') . ' * FROM (' . $sql . ')';
+		if ($limit > 0 || $offset > 0) {
+			// http://www.firebirdsql.org/refdocs/langrefupd20-select.html
+			$sql = 'SELECT ' . ($limit > 0 ? 'FIRST ' . $limit : '') . ($offset > 0 ? ' SKIP ' . $offset : '') . ' * FROM (' . $sql . ')';
 		}
 	}
 
@@ -345,7 +323,6 @@ class FirebirdDriver implements Dibi\Driver, Dibi\ResultDriver, Dibi\Reflector
 
 	/**
 	 * Automatically frees the resources allocated for this result set.
-	 * @return void
 	 */
 	public function __destruct()
 	{
@@ -355,9 +332,8 @@ class FirebirdDriver implements Dibi\Driver, Dibi\ResultDriver, Dibi\Reflector
 
 	/**
 	 * Returns the number of rows in a result set.
-	 * @return int
 	 */
-	public function getRowCount()
+	public function getRowCount(): int
 	{
 		throw new Dibi\NotSupportedException('Firebird/Interbase do not support returning number of rows in result set.');
 	}
@@ -365,12 +341,11 @@ class FirebirdDriver implements Dibi\Driver, Dibi\ResultDriver, Dibi\Reflector
 
 	/**
 	 * Fetches the row at current position and moves the internal cursor to the next position.
-	 * @param  bool     TRUE for associative array, FALSE for numeric
-	 * @return array    array on success, nonarray if no next record
+	 * @param  bool     true for associative array, false for numeric
 	 */
-	public function fetch($assoc)
+	public function fetch(bool $assoc): ?array
 	{
-		$result = $assoc ? ibase_fetch_assoc($this->resultSet, IBASE_TEXT) : ibase_fetch_row($this->resultSet, IBASE_TEXT); // intentionally @
+		$result = $assoc ? @ibase_fetch_assoc($this->resultSet, IBASE_TEXT) : @ibase_fetch_row($this->resultSet, IBASE_TEXT); // intentionally @
 
 		if (ibase_errcode()) {
 			if (ibase_errcode() == self::ERROR_EXCEPTION_THROWN) {
@@ -378,21 +353,19 @@ class FirebirdDriver implements Dibi\Driver, Dibi\ResultDriver, Dibi\Reflector
 				throw new Dibi\ProcedureException($match[3], $match[1], $match[2]);
 
 			} else {
-				throw new Dibi\DriverException($msg, ibase_errcode());
+				throw new Dibi\DriverException(ibase_errmsg(), ibase_errcode());
 			}
 		}
 
-		return $result;
+		return Helpers::false2Null($result);
 	}
 
 
 	/**
 	 * Moves cursor position without fetching row.
-	 * @param  int   the 0-based cursor pos to seek to
-	 * @return bool  TRUE on success, FALSE if unable to seek to specified record
 	 * @throws Dibi\Exception
 	 */
-	public function seek($row)
+	public function seek(int $row): bool
 	{
 		throw new Dibi\NotSupportedException('Firebird/Interbase do not support seek in result set.');
 	}
@@ -400,31 +373,29 @@ class FirebirdDriver implements Dibi\Driver, Dibi\ResultDriver, Dibi\Reflector
 
 	/**
 	 * Frees the resources allocated for this result set.
-	 * @return void
 	 */
-	public function free()
+	public function free(): void
 	{
 		ibase_free_result($this->resultSet);
-		$this->resultSet = NULL;
+		$this->resultSet = null;
 	}
 
 
 	/**
 	 * Returns the result set resource.
-	 * @return resource
+	 * @return resource|null
 	 */
 	public function getResultResource()
 	{
-		$this->autoFree = FALSE;
-		return is_resource($this->resultSet) ? $this->resultSet : NULL;
+		$this->autoFree = false;
+		return is_resource($this->resultSet) ? $this->resultSet : null;
 	}
 
 
 	/**
 	 * Returns metadata for all columns in a result set.
-	 * @return array
 	 */
-	public function getResultColumns()
+	public function getResultColumns(): array
 	{
 		$count = ibase_num_fields($this->resultSet);
 		$columns = [];
@@ -446,9 +417,8 @@ class FirebirdDriver implements Dibi\Driver, Dibi\ResultDriver, Dibi\Reflector
 
 	/**
 	 * Returns list of tables.
-	 * @return array
 	 */
-	public function getTables()
+	public function getTables(): array
 	{
 		$res = $this->query("
 			SELECT TRIM(RDB\$RELATION_NAME),
@@ -457,7 +427,7 @@ class FirebirdDriver implements Dibi\Driver, Dibi\ResultDriver, Dibi\Reflector
 			WHERE RDB\$SYSTEM_FLAG = 0;"
 		);
 		$tables = [];
-		while ($row = $res->fetch(FALSE)) {
+		while ($row = $res->fetch(false)) {
 			$tables[] = [
 				'name' => $row[0],
 				'view' => $row[1] === 'TRUE',
@@ -469,10 +439,8 @@ class FirebirdDriver implements Dibi\Driver, Dibi\ResultDriver, Dibi\Reflector
 
 	/**
 	 * Returns metadata for all columns in a table.
-	 * @param  string
-	 * @return array
 	 */
-	public function getColumns($table)
+	public function getColumns(string $table): array
 	{
 		$table = strtoupper($table);
 		$res = $this->query("
@@ -506,7 +474,7 @@ class FirebirdDriver implements Dibi\Driver, Dibi\ResultDriver, Dibi\Reflector
 
 		);
 		$columns = [];
-		while ($row = $res->fetch(TRUE)) {
+		while ($row = $res->fetch(true)) {
 			$key = $row['FIELD_NAME'];
 			$columns[$key] = [
 				'name' => $key,
@@ -515,7 +483,7 @@ class FirebirdDriver implements Dibi\Driver, Dibi\ResultDriver, Dibi\Reflector
 				'size' => $row['FIELD_LENGTH'],
 				'nullable' => $row['NULLABLE'] === 'TRUE',
 				'default' => $row['DEFAULT_VALUE'],
-				'autoincrement' => FALSE,
+				'autoincrement' => false,
 			];
 		}
 		return $columns;
@@ -524,10 +492,8 @@ class FirebirdDriver implements Dibi\Driver, Dibi\ResultDriver, Dibi\Reflector
 
 	/**
 	 * Returns metadata for all indexes in a table (the constraints are included).
-	 * @param  string
-	 * @return array
 	 */
-	public function getIndexes($table)
+	public function getIndexes(string $table): array
 	{
 		$table = strtoupper($table);
 		$res = $this->query("
@@ -544,7 +510,7 @@ class FirebirdDriver implements Dibi\Driver, Dibi\ResultDriver, Dibi\Reflector
 			ORDER BY s.RDB\$FIELD_POSITION"
 		);
 		$indexes = [];
-		while ($row = $res->fetch(TRUE)) {
+		while ($row = $res->fetch(true)) {
 			$key = $row['INDEX_NAME'];
 			$indexes[$key]['name'] = $key;
 			$indexes[$key]['unique'] = $row['UNIQUE_FLAG'] === 1;
@@ -558,10 +524,8 @@ class FirebirdDriver implements Dibi\Driver, Dibi\ResultDriver, Dibi\Reflector
 
 	/**
 	 * Returns metadata for all foreign keys in a table.
-	 * @param  string
-	 * @return array
 	 */
-	public function getForeignKeys($table)
+	public function getForeignKeys(string $table): array
 	{
 		$table = strtoupper($table);
 		$res = $this->query("
@@ -574,7 +538,7 @@ class FirebirdDriver implements Dibi\Driver, Dibi\ResultDriver, Dibi\Reflector
 			ORDER BY s.RDB\$FIELD_POSITION"
 		);
 		$keys = [];
-		while ($row = $res->fetch(TRUE)) {
+		while ($row = $res->fetch(true)) {
 			$key = $row['INDEX_NAME'];
 			$keys[$key] = [
 				'name' => $key,
@@ -588,10 +552,8 @@ class FirebirdDriver implements Dibi\Driver, Dibi\ResultDriver, Dibi\Reflector
 
 	/**
 	 * Returns list of indices in given table (the constraints are not listed).
-	 * @param  string
-	 * @return array
 	 */
-	public function getIndices($table)
+	public function getIndices(string $table): array
 	{
 		$res = $this->query("
 			SELECT TRIM(RDB\$INDEX_NAME)
@@ -601,7 +563,7 @@ class FirebirdDriver implements Dibi\Driver, Dibi\ResultDriver, Dibi\Reflector
 				AND RDB\$FOREIGN_KEY IS NULL;"
 		);
 		$indices = [];
-		while ($row = $res->fetch(FALSE)) {
+		while ($row = $res->fetch(false)) {
 			$indices[] = $row[0];
 		}
 		return $indices;
@@ -610,10 +572,8 @@ class FirebirdDriver implements Dibi\Driver, Dibi\ResultDriver, Dibi\Reflector
 
 	/**
 	 * Returns list of constraints in given table.
-	 * @param  string
-	 * @return array
 	 */
-	public function getConstraints($table)
+	public function getConstraints(string $table): array
 	{
 		$res = $this->query("
 			SELECT TRIM(RDB\$INDEX_NAME)
@@ -625,7 +585,7 @@ class FirebirdDriver implements Dibi\Driver, Dibi\ResultDriver, Dibi\Reflector
 			);"
 		);
 		$constraints = [];
-		while ($row = $res->fetch(FALSE)) {
+		while ($row = $res->fetch(false)) {
 			$constraints[] = $row[0];
 		}
 		return $constraints;
@@ -635,11 +595,8 @@ class FirebirdDriver implements Dibi\Driver, Dibi\ResultDriver, Dibi\Reflector
 	/**
 	 * Returns metadata for all triggers in a table or database.
 	 * (Only if user has permissions on ALTER TABLE, INSERT/UPDATE/DELETE record in table)
-	 * @param  string
-	 * @param  string
-	 * @return array
 	 */
-	public function getTriggersMeta($table = NULL)
+	public function getTriggersMeta(string $table = null): array
 	{
 		$res = $this->query("
 			SELECT TRIM(RDB\$TRIGGER_NAME) AS TRIGGER_NAME,
@@ -665,10 +622,10 @@ class FirebirdDriver implements Dibi\Driver, Dibi\ResultDriver, Dibi\Reflector
 				END AS TRIGGER_ENABLED
 			FROM RDB\$TRIGGERS
 			WHERE RDB\$SYSTEM_FLAG = 0"
-			. ($table === NULL ? ';' : " AND RDB\$RELATION_NAME = UPPER('$table');")
+			. ($table === null ? ';' : " AND RDB\$RELATION_NAME = UPPER('$table');")
 		);
 		$triggers = [];
-		while ($row = $res->fetch(TRUE)) {
+		while ($row = $res->fetch(true)) {
 			$triggers[$row['TRIGGER_NAME']] = [
 				'name' => $row['TRIGGER_NAME'],
 				'table' => $row['TABLE_NAME'],
@@ -684,19 +641,17 @@ class FirebirdDriver implements Dibi\Driver, Dibi\ResultDriver, Dibi\Reflector
 	/**
 	 * Returns list of triggers for given table.
 	 * (Only if user has permissions on ALTER TABLE, INSERT/UPDATE/DELETE record in table)
-	 * @param  string
-	 * @return array
 	 */
-	public function getTriggers($table = NULL)
+	public function getTriggers(string $table = null): array
 	{
-		$q = "SELECT TRIM(RDB\$TRIGGER_NAME)
-			FROM RDB\$TRIGGERS
-			WHERE RDB\$SYSTEM_FLAG = 0";
-		$q .= $table === NULL ? ';' : " AND RDB\$RELATION_NAME = UPPER('$table')";
+		$q = 'SELECT TRIM(RDB$TRIGGER_NAME)
+			FROM RDB$TRIGGERS
+			WHERE RDB$SYSTEM_FLAG = 0';
+		$q .= $table === null ? ';' : " AND RDB\$RELATION_NAME = UPPER('$table')";
 
 		$res = $this->query($q);
 		$triggers = [];
-		while ($row = $res->fetch(FALSE)) {
+		while ($row = $res->fetch(false)) {
 			$triggers[] = $row[0];
 		}
 		return $triggers;
@@ -705,10 +660,8 @@ class FirebirdDriver implements Dibi\Driver, Dibi\ResultDriver, Dibi\Reflector
 
 	/**
 	 * Returns metadata from stored procedures and their input and output parameters.
-	 * @param  string
-	 * @return array
 	 */
-	public function getProceduresMeta()
+	public function getProceduresMeta(): array
 	{
 		$res = $this->query("
 			SELECT
@@ -743,7 +696,7 @@ class FirebirdDriver implements Dibi\Driver, Dibi\ResultDriver, Dibi\Reflector
 			ORDER BY p.RDB\$PARAMETER_TYPE, p.RDB\$PARAMETER_NUMBER;"
 		);
 		$procedures = [];
-		while ($row = $res->fetch(TRUE)) {
+		while ($row = $res->fetch(true)) {
 			$key = $row['PROCEDURE_NAME'];
 			$io = trim($row['PARAMETER_TYPE']);
 			$num = $row['PARAMETER_NUMBER'];
@@ -758,16 +711,15 @@ class FirebirdDriver implements Dibi\Driver, Dibi\ResultDriver, Dibi\Reflector
 
 	/**
 	 * Returns list of stored procedures.
-	 * @return array
 	 */
-	public function getProcedures()
+	public function getProcedures(): array
 	{
-		$res = $this->query("
-			SELECT TRIM(RDB\$PROCEDURE_NAME)
-			FROM RDB\$PROCEDURES;"
+		$res = $this->query('
+			SELECT TRIM(RDB$PROCEDURE_NAME)
+			FROM RDB$PROCEDURES;'
 		);
 		$procedures = [];
-		while ($row = $res->fetch(FALSE)) {
+		while ($row = $res->fetch(false)) {
 			$procedures[] = $row[0];
 		}
 		return $procedures;
@@ -776,17 +728,16 @@ class FirebirdDriver implements Dibi\Driver, Dibi\ResultDriver, Dibi\Reflector
 
 	/**
 	 * Returns list of generators.
-	 * @return array
 	 */
-	public function getGenerators()
+	public function getGenerators(): array
 	{
-		$res = $this->query("
-			SELECT TRIM(RDB\$GENERATOR_NAME)
-			FROM RDB\$GENERATORS
-			WHERE RDB\$SYSTEM_FLAG = 0;"
+		$res = $this->query('
+			SELECT TRIM(RDB$GENERATOR_NAME)
+			FROM RDB$GENERATORS
+			WHERE RDB$SYSTEM_FLAG = 0;'
 		);
 		$generators = [];
-		while ($row = $res->fetch(FALSE)) {
+		while ($row = $res->fetch(false)) {
 			$generators[] = $row[0];
 		}
 		return $generators;
@@ -795,20 +746,18 @@ class FirebirdDriver implements Dibi\Driver, Dibi\ResultDriver, Dibi\Reflector
 
 	/**
 	 * Returns list of user defined functions (UDF).
-	 * @return array
 	 */
-	public function getFunctions()
+	public function getFunctions(): array
 	{
-		$res = $this->query("
-			SELECT TRIM(RDB\$FUNCTION_NAME)
-			FROM RDB\$FUNCTIONS
-			WHERE RDB\$SYSTEM_FLAG = 0;"
+		$res = $this->query('
+			SELECT TRIM(RDB$FUNCTION_NAME)
+			FROM RDB$FUNCTIONS
+			WHERE RDB$SYSTEM_FLAG = 0;'
 		);
 		$functions = [];
-		while ($row = $res->fetch(FALSE)) {
+		while ($row = $res->fetch(false)) {
 			$functions[] = $row[0];
 		}
 		return $functions;
 	}
-
 }

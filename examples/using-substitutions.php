@@ -1,10 +1,13 @@
+<?php
+declare(strict_types=1);
+?>
 <!DOCTYPE html><link rel="stylesheet" href="data/style.css">
 
 <h1>Using Substitutions | dibi</h1>
 
 <?php
 
-require __DIR__ . '/../src/loader.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 
 dibi::connect([
@@ -37,6 +40,7 @@ function substFallBack($expr)
 		throw new Exception("Undefined substitution :$expr:");
 	}
 }
+
 
 // define callback
 dibi::getSubstitutes()->setCallback('substFallBack');

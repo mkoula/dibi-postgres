@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 
 use Tester\Assert;
 
@@ -11,7 +12,7 @@ $conn = new Dibi\Connection($config);
 $arr = [
 	'title' => 'Super Product',
 	'price' => 12,
-	'brand' => NULL,
+	'brand' => null,
 ];
 
 $fluent = $conn->insert('table', $arr)
@@ -22,7 +23,7 @@ Assert::same(
 	(string) $fluent
 );
 
-$fluent->setFlag('IGNORE', FALSE);
+$fluent->setFlag('IGNORE', false);
 
 Assert::same(
 	reformat('INSERT DELAYED INTO [table] ([title], [price], [brand]) VALUES (\'Super Product\', 12, NULL)'),

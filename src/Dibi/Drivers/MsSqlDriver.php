@@ -5,6 +5,8 @@
  * Copyright (c) 2005 David Grudl (https://davidgrudl.com)
  */
 
+declare(strict_types=1);
+
 namespace Dibi\Drivers;
 
 use Dibi;
@@ -26,14 +28,14 @@ class MsSqlDriver implements Dibi\Driver, Dibi\ResultDriver
 {
 	use Dibi\Strict;
 
-	/** @var resource  Connection resource */
+	/** @var resource|null */
 	private $connection;
 
-	/** @var resource  Resultset resource */
+	/** @var resource|null */
 	private $resultSet;
 
 	/** @var bool */
-	private $autoFree = TRUE;
+	private $autoFree = true;
 
 
 	/**
@@ -49,15 +51,14 @@ class MsSqlDriver implements Dibi\Driver, Dibi\ResultDriver
 
 	/**
 	 * Connects to a database.
-	 * @return void
 	 * @throws Dibi\Exception
 	 */
-	public function connect(array & $config)
+	public function connect(array &$config): void
 	{
 		if (isset($config['resource'])) {
 			$this->connection = $config['resource'];
 		} elseif (empty($config['persistent'])) {
-			$this->connection = @mssql_connect($config['host'], $config['username'], $config['password'], TRUE); // intentionally @
+			$this->connection = @mssql_connect($config['host'], $config['username'], $config['password'], true); // intentionally @
 		} else {
 			$this->connection = @mssql_pconnect($config['host'], $config['username'], $config['password']); // intentionally @
 		}
@@ -74,65 +75,59 @@ class MsSqlDriver implements Dibi\Driver, Dibi\ResultDriver
 
 	/**
 	 * Disconnects from a database.
-	 * @return void
 	 */
-	public function disconnect()
+	public function disconnect(): void
 	{
-		mssql_close($this->connection);
+		@mssql_close($this->connection); // @ - connection can be already disconnected
 	}
 
 
 	/**
 	 * Executes the SQL query.
-	 * @param  string      SQL statement.
-	 * @return Dibi\ResultDriver|NULL
 	 * @throws Dibi\DriverException
 	 */
-	public function query($sql)
+	public function query(string $sql): ?Dibi\ResultDriver
 	{
 		$res = @mssql_query($sql, $this->connection); // intentionally @
 
-		if ($res === FALSE) {
+		if ($res === false) {
 			throw new Dibi\DriverException(mssql_get_last_message(), 0, $sql);
 
 		} elseif (is_resource($res)) {
 			return $this->createResultDriver($res);
 		}
+		return null;
 	}
 
 
 	/**
 	 * Gets the number of affected rows by the last INSERT, UPDATE or DELETE query.
-	 * @return int|FALSE  number of rows or FALSE on error
 	 */
-	public function getAffectedRows()
+	public function getAffectedRows(): ?int
 	{
-		return mssql_rows_affected($this->connection);
+		return Dibi\Helpers::false2Null(mssql_rows_affected($this->connection));
 	}
 
 
 	/**
 	 * Retrieves the ID generated for an AUTO_INCREMENT column by the previous INSERT query.
-	 * @return int|FALSE  int on success or FALSE on failure
 	 */
-	public function getInsertId($sequence)
+	public function getInsertId(?string $sequence): ?int
 	{
 		$res = mssql_query('SELECT @@IDENTITY', $this->connection);
 		if (is_resource($res)) {
 			$row = mssql_fetch_row($res);
 			return $row[0];
 		}
-		return FALSE;
+		return null;
 	}
 
 
 	/**
 	 * Begins a transaction (if supported).
-	 * @param  string  optional savepoint name
-	 * @return void
 	 * @throws Dibi\DriverException
 	 */
-	public function begin($savepoint = NULL)
+	public function begin(string $savepoint = null): void
 	{
 		$this->query('BEGIN TRANSACTION');
 	}
@@ -140,11 +135,9 @@ class MsSqlDriver implements Dibi\Driver, Dibi\ResultDriver
 
 	/**
 	 * Commits statements in a transaction.
-	 * @param  string  optional savepoint name
-	 * @return void
 	 * @throws Dibi\DriverException
 	 */
-	public function commit($savepoint = NULL)
+	public function commit(string $savepoint = null): void
 	{
 		$this->query('COMMIT');
 	}
@@ -152,11 +145,9 @@ class MsSqlDriver implements Dibi\Driver, Dibi\ResultDriver
 
 	/**
 	 * Rollback changes in a transaction.
-	 * @param  string  optional savepoint name
-	 * @return void
 	 * @throws Dibi\DriverException
 	 */
-	public function rollback($savepoint = NULL)
+	public function rollback(string $savepoint = null): void
 	{
 		$this->query('ROLLBACK');
 	}
@@ -164,19 +155,18 @@ class MsSqlDriver implements Dibi\Driver, Dibi\ResultDriver
 
 	/**
 	 * Returns the connection resource.
-	 * @return mixed
+	 * @return resource|null
 	 */
 	public function getResource()
 	{
-		return is_resource($this->connection) ? $this->connection : NULL;
+		return is_resource($this->connection) ? $this->connection : null;
 	}
 
 
 	/**
 	 * Returns the connection reflector.
-	 * @return Dibi\Reflector
 	 */
-	public function getReflector()
+	public function getReflector(): Dibi\Reflector
 	{
 		return new MsSqlReflector($this);
 	}
@@ -185,9 +175,8 @@ class MsSqlDriver implements Dibi\Driver, Dibi\ResultDriver
 	/**
 	 * Result set driver factory.
 	 * @param  resource
-	 * @return Dibi\ResultDriver
 	 */
-	public function createResultDriver($resource)
+	public function createResultDriver($resource): Dibi\ResultDriver
 	{
 		$res = clone $this;
 		$res->resultSet = $resource;
@@ -200,59 +189,60 @@ class MsSqlDriver implements Dibi\Driver, Dibi\ResultDriver
 
 	/**
 	 * Encodes data for use in a SQL statement.
-	 * @param  mixed     value
-	 * @return string    encoded value
 	 */
-	public function escapeText($value)
+	public function escapeText(string $value): string
 	{
 		return "'" . str_replace("'", "''", $value) . "'";
 	}
 
 
-	public function escapeBinary($value)
+	public function escapeBinary(string $value): string
 	{
 		return "'" . str_replace("'", "''", $value) . "'";
 	}
 
 
-	public function escapeIdentifier($value)
+	public function escapeIdentifier(string $value): string
 	{
 		// @see https://msdn.microsoft.com/en-us/library/ms176027.aspx
 		return '[' . str_replace(['[', ']'], ['[[', ']]'], $value) . ']';
 	}
 
 
-	public function escapeBool($value)
+	public function escapeBool(bool $value): string
 	{
-		return $value ? 1 : 0;
+		return $value ? '1' : '0';
 	}
 
 
-	public function escapeDate($value)
+	/**
+	 * @param  \DateTimeInterface|string|int
+	 */
+	public function escapeDate($value): string
 	{
-		if (!$value instanceof \DateTime && !$value instanceof \DateTimeInterface) {
+		if (!$value instanceof \DateTimeInterface) {
 			$value = new Dibi\DateTime($value);
 		}
 		return $value->format("'Y-m-d'");
 	}
 
 
-	public function escapeDateTime($value)
+	/**
+	 * @param  \DateTimeInterface|string|int
+	 */
+	public function escapeDateTime($value): string
 	{
-		if (!$value instanceof \DateTime && !$value instanceof \DateTimeInterface) {
+		if (!$value instanceof \DateTimeInterface) {
 			$value = new Dibi\DateTime($value);
 		}
-		return $value->format("'Y-m-d H:i:s'");
+		return 'CONVERT(DATETIME2(7), ' . $value->format("'Y-m-d H:i:s.u'") . ')';
 	}
 
 
 	/**
 	 * Encodes string for use in a LIKE statement.
-	 * @param  string
-	 * @param  int
-	 * @return string
 	 */
-	public function escapeLike($value, $pos)
+	public function escapeLike(string $value, int $pos): string
 	{
 		$value = strtr($value, ["'" => "''", '%' => '[%]', '_' => '[_]', '[' => '[[]']);
 		return ($pos <= 0 ? "'%" : "'") . $value . ($pos >= 0 ? "%'" : "'");
@@ -261,28 +251,17 @@ class MsSqlDriver implements Dibi\Driver, Dibi\ResultDriver
 
 	/**
 	 * Decodes data from result set.
-	 * @param  string
-	 * @return string
 	 */
-	public function unescapeBinary($value)
+	public function unescapeBinary(string $value): string
 	{
 		return $value;
 	}
 
 
-	/** @deprecated */
-	public function escape($value, $type)
-	{
-		trigger_error(__METHOD__ . '() is deprecated.', E_USER_DEPRECATED);
-		return Dibi\Helpers::escape($this, $value, $type);
-	}
-
-
 	/**
 	 * Injects LIMIT/OFFSET to the SQL query.
-	 * @return void
 	 */
-	public function applyLimit(& $sql, $limit, $offset)
+	public function applyLimit(string &$sql, ?int $limit, ?int $offset): void
 	{
 		if ($offset) {
 			throw new Dibi\NotSupportedException('Offset is not supported by this database.');
@@ -290,8 +269,8 @@ class MsSqlDriver implements Dibi\Driver, Dibi\ResultDriver
 		} elseif ($limit < 0) {
 			throw new Dibi\NotSupportedException('Negative offset or limit.');
 
-		} elseif ($limit !== NULL) {
-			$sql = 'SELECT TOP ' . (int) $limit . ' * FROM (' . $sql . ') t';
+		} elseif ($limit !== null) {
+			$sql = 'SELECT TOP ' . $limit . ' * FROM (' . $sql . ') t';
 		}
 	}
 
@@ -301,7 +280,6 @@ class MsSqlDriver implements Dibi\Driver, Dibi\ResultDriver
 
 	/**
 	 * Automatically frees the resources allocated for this result set.
-	 * @return void
 	 */
 	public function __destruct()
 	{
@@ -311,9 +289,8 @@ class MsSqlDriver implements Dibi\Driver, Dibi\ResultDriver
 
 	/**
 	 * Returns the number of rows in a result set.
-	 * @return int
 	 */
-	public function getRowCount()
+	public function getRowCount(): int
 	{
 		return mssql_num_rows($this->resultSet);
 	}
@@ -321,21 +298,19 @@ class MsSqlDriver implements Dibi\Driver, Dibi\ResultDriver
 
 	/**
 	 * Fetches the row at current position and moves the internal cursor to the next position.
-	 * @param  bool     TRUE for associative array, FALSE for numeric
-	 * @return array    array on success, nonarray if no next record
+	 * @param  bool     true for associative array, false for numeric
 	 */
-	public function fetch($assoc)
+	public function fetch(bool $assoc): ?array
 	{
-		return mssql_fetch_array($this->resultSet, $assoc ? MSSQL_ASSOC : MSSQL_NUM);
+		return Dibi\Helpers::false2Null(mssql_fetch_array($this->resultSet, $assoc ? MSSQL_ASSOC : MSSQL_NUM));
 	}
 
 
 	/**
 	 * Moves cursor position without fetching row.
-	 * @param  int      the 0-based cursor pos to seek to
-	 * @return boolean  TRUE on success, FALSE if unable to seek to specified record
+	 * @return bool  true on success, false if unable to seek to specified record
 	 */
-	public function seek($row)
+	public function seek(int $row): bool
 	{
 		return mssql_data_seek($this->resultSet, $row);
 	}
@@ -343,20 +318,18 @@ class MsSqlDriver implements Dibi\Driver, Dibi\ResultDriver
 
 	/**
 	 * Frees the resources allocated for this result set.
-	 * @return void
 	 */
-	public function free()
+	public function free(): void
 	{
 		mssql_free_result($this->resultSet);
-		$this->resultSet = NULL;
+		$this->resultSet = null;
 	}
 
 
 	/**
 	 * Returns metadata for all columns in a result set.
-	 * @return array
 	 */
-	public function getResultColumns()
+	public function getResultColumns(): array
 	{
 		$count = mssql_num_fields($this->resultSet);
 		$columns = [];
@@ -375,12 +348,11 @@ class MsSqlDriver implements Dibi\Driver, Dibi\ResultDriver
 
 	/**
 	 * Returns the result set resource.
-	 * @return mixed
+	 * @return resource|null
 	 */
 	public function getResultResource()
 	{
-		$this->autoFree = FALSE;
-		return is_resource($this->resultSet) ? $this->resultSet : NULL;
+		$this->autoFree = false;
+		return is_resource($this->resultSet) ? $this->resultSet : null;
 	}
-
 }

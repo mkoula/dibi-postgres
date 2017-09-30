@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 
 use Tester\Assert;
 
@@ -7,25 +8,31 @@ require __DIR__ . '/bootstrap.php';
 
 class MockDriver extends Dibi\Drivers\SqlsrvDriver
 {
-	function __construct()
-	{}
+	public function __construct()
+	{
+	}
 
-	function connect(array & $config)
-	{}
 
-	function query($sql)
+	public function connect(array &$config): void
+	{
+	}
+
+
+	public function query(string $sql): ?Dibi\ResultDriver
 	{
 		return $this;
 	}
 
-	function getResultColumns()
+
+	public function getResultColumns(): array
 	{
 		return [];
 	}
 
-	function fetch($assoc)
+
+	public function fetch(bool $type): ?array
 	{
-		return FALSE;
+		return null;
 	}
 }
 

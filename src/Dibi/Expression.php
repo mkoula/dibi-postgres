@@ -11,24 +11,24 @@ namespace Dibi;
 
 
 /**
- * SQL literal value.
+ * SQL expression.
  */
-class Literal
+class Expression
 {
 	use Strict;
 
-	/** @var string */
-	private $value;
+	/** @var array */
+	private $values;
 
 
-	public function __construct($value)
+	public function __construct(...$values)
 	{
-		$this->value = (string) $value;
+		$this->values = $values;
 	}
 
 
-	public function __toString(): string
+	public function getValues(): array
 	{
-		return $this->value;
+		return $this->values;
 	}
 }

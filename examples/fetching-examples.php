@@ -1,8 +1,5 @@
-<!DOCTYPE html><link rel="stylesheet" href="data/style.css">
-
-<h1>Fetching Examples | dibi</h1>
-
 <?php
+declare(strict_types=1);
 
 if (@!include __DIR__ . '/../vendor/autoload.php') {
 	die('Install dependencies using `composer install --dev`');
@@ -10,6 +7,12 @@ if (@!include __DIR__ . '/../vendor/autoload.php') {
 
 Tracy\Debugger::enable();
 
+?>
+<!DOCTYPE html><link rel="stylesheet" href="data/style.css">
+
+<h1>Fetching Examples | dibi</h1>
+
+<?php
 
 dibi::connect([
 	'driver' => 'sqlite3',

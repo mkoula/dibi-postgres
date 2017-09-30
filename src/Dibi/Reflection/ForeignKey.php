@@ -5,6 +5,8 @@
  * Copyright (c) 2005 David Grudl (https://davidgrudl.com)
  */
 
+declare(strict_types=1);
+
 namespace Dibi\Reflection;
 
 use Dibi;
@@ -34,21 +36,14 @@ class ForeignKey
 	}
 
 
-	/**
-	 * @return string
-	 */
-	public function getName()
+	public function getName(): string
 	{
 		return $this->name;
 	}
 
 
-	/**
-	 * @return array
-	 */
-	public function getReferences()
+	public function getReferences(): array
 	{
 		return $this->references;
 	}
-
 }

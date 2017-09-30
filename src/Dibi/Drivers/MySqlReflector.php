@@ -5,6 +5,8 @@
  * Copyright (c) 2005 David Grudl (https://davidgrudl.com)
  */
 
+declare(strict_types=1);
+
 namespace Dibi\Drivers;
 
 use Dibi;
@@ -30,13 +32,12 @@ class MySqlReflector implements Dibi\Reflector
 
 	/**
 	 * Returns list of tables.
-	 * @return array
 	 */
-	public function getTables()
+	public function getTables(): array
 	{
 		$res = $this->driver->query('SHOW FULL TABLES');
 		$tables = [];
-		while ($row = $res->fetch(FALSE)) {
+		while ($row = $res->fetch(false)) {
 			$tables[] = [
 				'name' => $row[0],
 				'view' => isset($row[1]) && $row[1] === 'VIEW',
@@ -48,20 +49,18 @@ class MySqlReflector implements Dibi\Reflector
 
 	/**
 	 * Returns metadata for all columns in a table.
-	 * @param  string
-	 * @return array
 	 */
-	public function getColumns($table)
+	public function getColumns(string $table): array
 	{
 		$res = $this->driver->query("SHOW FULL COLUMNS FROM {$this->driver->escapeIdentifier($table)}");
 		$columns = [];
-		while ($row = $res->fetch(TRUE)) {
+		while ($row = $res->fetch(true)) {
 			$type = explode('(', $row['Type']);
 			$columns[] = [
 				'name' => $row['Field'],
 				'table' => $table,
 				'nativetype' => strtoupper($type[0]),
-				'size' => isset($type[1]) ? (int) $type[1] : NULL,
+				'size' => isset($type[1]) ? (int) $type[1] : null,
 				'unsigned' => (bool) strstr($row['Type'], 'unsigned'),
 				'nullable' => $row['Null'] === 'YES',
 				'default' => $row['Default'],
@@ -75,14 +74,12 @@ class MySqlReflector implements Dibi\Reflector
 
 	/**
 	 * Returns metadata for all indexes in a table.
-	 * @param  string
-	 * @return array
 	 */
-	public function getIndexes($table)
+	public function getIndexes(string $table): array
 	{
 		$res = $this->driver->query("SHOW INDEX FROM {$this->driver->escapeIdentifier($table)}");
 		$indexes = [];
-		while ($row = $res->fetch(TRUE)) {
+		while ($row = $res->fetch(true)) {
 			$indexes[$row['Key_name']]['name'] = $row['Key_name'];
 			$indexes[$row['Key_name']]['unique'] = !$row['Non_unique'];
 			$indexes[$row['Key_name']]['primary'] = $row['Key_name'] === 'PRIMARY';
@@ -94,13 +91,11 @@ class MySqlReflector implements Dibi\Reflector
 
 	/**
 	 * Returns metadata for all foreign keys in a table.
-	 * @param  string
-	 * @return array
 	 * @throws Dibi\NotSupportedException
 	 */
-	public function getForeignKeys($table)
+	public function getForeignKeys(string $table): array
 	{
-		$data = $this->driver->query("SELECT `ENGINE` FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = {$this->driver->escapeText($table)}")->fetch(TRUE);
+		$data = $this->driver->query("SELECT `ENGINE` FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = {$this->driver->escapeText($table)}")->fetch(true);
 		if ($data['ENGINE'] !== 'InnoDB') {
 			throw new Dibi\NotSupportedException("Foreign keys are not supported in {$data['ENGINE']} tables.");
 		}
@@ -119,7 +114,7 @@ class MySqlReflector implements Dibi\Reflector
 		");
 
 		$foreignKeys = [];
-		while ($row = $res->fetch(TRUE)) {
+		while ($row = $res->fetch(true)) {
 			$keyName = $row['CONSTRAINT_NAME'];
 
 			$foreignKeys[$keyName]['name'] = $keyName;
@@ -131,5 +126,4 @@ class MySqlReflector implements Dibi\Reflector
 		}
 		return array_values($foreignKeys);
 	}
-
 }

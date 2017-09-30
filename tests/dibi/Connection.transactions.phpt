@@ -4,6 +4,8 @@
  * @dataProvider ../databases.ini
  */
 
+declare(strict_types=1);
+
 use Tester\Assert;
 
 require __DIR__ . '/bootstrap.php';
@@ -15,16 +17,16 @@ $conn->loadFile(__DIR__ . "/data/$config[system].sql");
 
 /*Assert::exception(function () use ($conn) {
 	$conn->rollback();
-}, 'Dibi\Exception');
+}, Dibi\Exception::class);
 
 Assert::exception(function () use ($conn) {
 	$conn->commit();
-}, 'Dibi\Exception');
+}, Dibi\Exception::class);
 
 $conn->begin();
 Assert::exception(function () use ($conn) {
 	$conn->begin();
-}, 'Dibi\Exception');
+}, Dibi\Exception::class);
 */
 
 

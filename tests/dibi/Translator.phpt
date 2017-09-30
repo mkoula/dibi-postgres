@@ -4,28 +4,31 @@
  * @dataProvider ../databases.ini
  */
 
-use Tester\Assert;
+declare(strict_types=1);
+
 use Dibi\DateTime;
+use Tester\Assert;
 
 require __DIR__ . '/bootstrap.php';
 
-$conn = new Dibi\Connection($config + ['formatDateTime' => "'Y-m-d H:i:s'", 'formatDate' => "'Y-m-d'"]);
+$conn = new Dibi\Connection($config + ['formatDateTime' => "'Y-m-d H:i:s.u'", 'formatDate' => "'Y-m-d'"]);
 
 
 // dibi detects INSERT or REPLACE command & booleans
 Assert::same(
 	reformat("REPLACE INTO [products] ([title], [price]) VALUES ('Drticka', 318)"),
 	$conn->translate('REPLACE INTO [products]', [
-	'title' => 'Drticka',
-	'price' => 318,
-]));
+		'title' => 'Drticka',
+		'price' => 318,
+	])
+);
 
 
 // multiple INSERT command
 $array = [
 	'title' => 'Super Product',
 	'price' => 12,
-	'brand' => NULL,
+	'brand' => null,
 ];
 Assert::same(
 	reformat('INSERT INTO [products] ([title], [price], [brand]) VALUES (\'Super Product\', 12, NULL) , (\'Super Product\', 12, NULL) , (\'Super Product\', 12, NULL)'),
@@ -49,9 +52,10 @@ Assert::same(
 Assert::same(
 	reformat("UPDATE [colors] SET [color]='blue', [order]=12 WHERE [id]=123"),
 	$conn->translate('UPDATE [colors] SET', [
-	'color' => 'blue',
-	'order' => 12,
-], 'WHERE [id]=%i', 123));
+		'color' => 'blue',
+		'order' => 12,
+	], 'WHERE [id]=%i', 123)
+);
 
 
 // IN array
@@ -77,7 +81,7 @@ Assert::same(
 // invalid input
 $e = Assert::exception(function () use ($conn) {
 	$conn->translate('SELECT %s', (object) [123], ', %m', 123);
-}, 'Dibi\Exception', 'SQL translate error: Invalid combination of type stdClass and modifier %s');
+}, Dibi\Exception::class, 'SQL translate error: Invalid combination of type stdClass and modifier %s');
 Assert::same('SELECT **Invalid combination of type stdClass and modifier %s** , **Unknown or unexpected modifier %m**', $e->getSql());
 
 Assert::same(
@@ -95,7 +99,7 @@ Assert::same(
 	$conn->translate('TEST %and', ['[cond] > 2', '[cond2] = "3"', 'cond3 < RAND()'])
 );
 
-//
+
 $where = [];
 $where[] = '[age] > 20';
 $where[] = '[email] IS NOT NULL';
@@ -106,7 +110,7 @@ Assert::same(
 
 
 $where = [];
-$where['age'] = NULL;
+$where['age'] = null;
 $where['email'] = 'ahoj';
 $where['id%l'] = [10, 20, 30];
 Assert::same(
@@ -128,8 +132,8 @@ $order = [
 	'field2' => 'desc',
 	'field3' => 1,
 	'field4' => -1,
-	'field5' => TRUE,
-	'field6' => FALSE,
+	'field5' => true,
+	'field6' => false,
 ];
 Assert::same(
 	reformat('SELECT * FROM [people] ORDER BY [field1] ASC, [field2] DESC, [field3] ASC, [field4] DESC, [field5] ASC, [field6] DESC'),
@@ -150,13 +154,13 @@ Assert::same(
 if ($config['system'] === 'odbc') {
 	Assert::exception(function () use ($conn) {
 		$conn->translate('SELECT * FROM [products] %lmt %ofs', 2, 1);
-	}, 'Dibi\Exception');
+	}, Dibi\Exception::class);
 } else {
 	// with limit = 2, offset = 1
 	Assert::same(
 		reformat([
 			'sqlsrv' => 'SELECT * FROM [products] OFFSET 1 ROWS FETCH NEXT 2 ROWS ONLY',
-			'SELECT * FROM [products]   LIMIT 2 OFFSET 1'
+			'SELECT * FROM [products]   LIMIT 2 OFFSET 1',
 		]),
 		$conn->translate('SELECT * FROM [products] %lmt %ofs', 2, 1)
 	);
@@ -178,26 +182,30 @@ if ($config['system'] === 'odbc') {
 
 Assert::same(
 	reformat([
-		'odbc' => 'INSERT INTO test ([a2], [a4], [b1], [b2], [b3], [b4], [b5], [b6], [b7], [b8], [b9]) VALUES (#09/26/1212 00:00:00#, #12/31/1969 22:13:20#, #09/26/1212#, #09/26/1212 00:00:00#, #12/31/1969#, #12/31/1969 22:13:20#, #09/26/1212 00:00:00#, #09/26/1212#, #09/26/1212 00:00:00#, NULL, NULL)',
-		"INSERT INTO test ([a2], [a4], [b1], [b2], [b3], [b4], [b5], [b6], [b7], [b8], [b9]) VALUES ('1212-09-26 00:00:00', '1969-12-31 22:13:20', '1212-09-26', '1212-09-26 00:00:00', '1969-12-31', '1969-12-31 22:13:20', '1212-09-26 00:00:00', '1212-09-26', '1212-09-26 00:00:00', NULL, NULL)",
+		'odbc' => 'INSERT INTO test ([a2], [a4], [b1], [b2], [b3], [b4], [b5], [b6], [b7], [b8], [b9], [c1]) VALUES (#09/26/1212 00:00:00.000000#, #12/31/1969 22:13:20.000000#, #09/26/1212#, #09/26/1212 00:00:00.000000#, #12/31/1969#, #12/31/1969 22:13:20.000000#, #09/26/1212 00:00:00.000000#, #09/26/1212#, #09/26/1212 00:00:00.000000#, NULL, NULL, #09/26/1212 16:51:34.012400#)',
+		'mssql' => "INSERT INTO test ([a2], [a4], [b1], [b2], [b3], [b4], [b5], [b6], [b7], [b8], [b9], [c1]) VALUES (CONVERT(DATETIME2(7), '1212-09-26 00:00:00.000000'), CONVERT(DATETIME2(7), '1969-12-31 22:13:20.000000'), '1212-09-26', CONVERT(DATETIME2(7), '1212-09-26 00:00:00.000000'), '1969-12-31', CONVERT(DATETIME2(7), '1969-12-31 22:13:20.000000'), CONVERT(DATETIME2(7), '1212-09-26 00:00:00.000000'), '1212-09-26', CONVERT(DATETIME2(7), '1212-09-26 00:00:00.000000'), NULL, NULL, CONVERT(DATETIME2(7), '1212-09-26 16:51:34.012400'))",
+		'sqlsrv' => "INSERT INTO test ([a2], [a4], [b1], [b2], [b3], [b4], [b5], [b6], [b7], [b8], [b9], [c1]) VALUES (CONVERT(DATETIME2(7), '1212-09-26 00:00:00.000000'), CONVERT(DATETIME2(7), '1969-12-31 22:13:20.000000'), '1212-09-26', CONVERT(DATETIME2(7), '1212-09-26 00:00:00.000000'), '1969-12-31', CONVERT(DATETIME2(7), '1969-12-31 22:13:20.000000'), CONVERT(DATETIME2(7), '1212-09-26 00:00:00.000000'), '1212-09-26', CONVERT(DATETIME2(7), '1212-09-26 00:00:00.000000'), NULL, NULL, CONVERT(DATETIME2(7), '1212-09-26 16:51:34.012400'))",
+		"INSERT INTO test ([a2], [a4], [b1], [b2], [b3], [b4], [b5], [b6], [b7], [b8], [b9], [c1]) VALUES ('1212-09-26 00:00:00.000000', '1969-12-31 22:13:20.000000', '1212-09-26', '1212-09-26 00:00:00.000000', '1969-12-31', '1969-12-31 22:13:20.000000', '1212-09-26 00:00:00.000000', '1212-09-26', '1212-09-26 00:00:00.000000', NULL, NULL, '1212-09-26 16:51:34.012400')",
 	]),
 	$conn->translate('INSERT INTO test', [
-	'a2' => new DateTime('1212-09-26'),
-	'a4' => new DateTime(-10000),
-	'b1%d' => '1212-09-26',
-	'b2%t' => '1212-09-26',
-	'b3%d' => -10000,
-	'b4%t' => -10000,
-	'b5' => new DateTime('1212-09-26'),
-	'b6%d' => new DateTime('1212-09-26'),
-	'b7%t' => new DateTime('1212-09-26'),
-	'b8%d' => NULL,
-	'b9%t' => NULL,
-]));
+		'a2' => new DateTime('1212-09-26'),
+		'a4' => new DateTime(-10000),
+		'b1%d' => '1212-09-26',
+		'b2%t' => '1212-09-26',
+		'b3%d' => -10000,
+		'b4%t' => -10000,
+		'b5' => new DateTime('1212-09-26'),
+		'b6%d' => new DateTime('1212-09-26'),
+		'b7%t' => new DateTime('1212-09-26'),
+		'b8%d' => null,
+		'b9%t' => null,
+		'c1%t' => new DateTime('1212-09-26 16:51:34.0124'),
+	])
+);
 
 Assert::exception(function () use ($conn) {
 	$conn->translate('SELECT %s', new DateTime('1212-09-26'));
-}, 'Dibi\Exception', 'SQL translate error: Invalid combination of type Dibi\DateTime and modifier %s');
+}, Dibi\Exception::class, 'SQL translate error: Invalid combination of type Dibi\DateTime and modifier %s');
 
 
 
@@ -239,7 +247,7 @@ if ($config['system'] === 'postgre') {
 
 $e = Assert::exception(function () use ($conn) {
 	$conn->translate("SELECT '");
-}, 'Dibi\Exception', 'SQL translate error: Alone quote');
+}, Dibi\Exception::class, 'SQL translate error: Alone quote');
 Assert::same('SELECT **Alone quote**', $e->getSql());
 
 Assert::match(
@@ -280,11 +288,11 @@ $array2 = ['one', 'two', 'three'];
 $array3 = [
 	'col1' => 'one',
 	'col2' => 'two',
-	'col3' => 'three',
+	'col3' => 'thr.ee',
 ];
 $array4 = [
 	'a' => 12,
-	'b' => NULL,
+	'b' => null,
 	'c' => new DateTime('12.3.2007'),
 	'd' => 'any string',
 ];
@@ -301,8 +309,8 @@ WHERE (`test`.`a` LIKE '1995-03-01'
 	OR `b2` IN ('1', '2', '3' )
 	OR `b3` IN ( )
 	OR `b4` IN ( 'one', 'two', 'three' )
-	OR `b5` IN (`col1` AS `one`, `col2` AS `two`, `col3` AS `three` )
-	OR `b6` IN ('one', 'two', 'three')
+	OR `b5` IN (`col1` AS `one`, `col2` AS `two`, `col3` AS `thr.ee` )
+	OR `b6` IN ('one', 'two', 'thr.ee')
 	OR `b7` IN (NULL)
 	OR `b8` IN (RAND() `col1` > `col2` )
 	OR `b9` IN (RAND(), [col1] > [col2] )
@@ -322,8 +330,8 @@ WHERE ("test"."a" LIKE \'1995-03-01\'
 	OR "b2" IN (\'1\', \'2\', \'3\' )
 	OR "b3" IN ( )
 	OR "b4" IN ( \'one\', \'two\', \'three\' )
-	OR "b5" IN ("col1" AS "one", "col2" AS "two", "col3" AS "three" )
-	OR "b6" IN (\'one\', \'two\', \'three\')
+	OR "b5" IN ("col1" AS "one", "col2" AS "two", "col3" AS "thr.ee" )
+	OR "b6" IN (\'one\', \'two\', \'thr.ee\')
 	OR "b7" IN (NULL)
 	OR "b8" IN (RAND() "col1" > "col2" )
 	OR "b9" IN (RAND(), [col1] > [col2] )
@@ -343,8 +351,8 @@ WHERE ([test].[a] LIKE #03/01/1995#
 	OR [b2] IN ('1', '2', '3' )
 	OR [b3] IN ( )
 	OR [b4] IN ( 'one', 'two', 'three' )
-	OR [b5] IN ([col1] AS [one], [col2] AS [two], [col3] AS [three] )
-	OR [b6] IN ('one', 'two', 'three')
+	OR [b5] IN ([col1] AS [one], [col2] AS [two], [col3] AS [thr.ee] )
+	OR [b6] IN ('one', 'two', 'thr.ee')
 	OR [b7] IN (NULL)
 	OR [b8] IN (RAND() [col1] > [col2] )
 	OR [b9] IN (RAND(), [col1] > [col2] )
@@ -364,8 +372,8 @@ WHERE ([test].[a] LIKE '1995-03-01'
 	OR [b2] IN ('1', '2', '3' )
 	OR [b3] IN ( )
 	OR [b4] IN ( 'one', 'two', 'three' )
-	OR [b5] IN ([col1] AS [one], [col2] AS [two], [col3] AS [three] )
-	OR [b6] IN ('one', 'two', 'three')
+	OR [b5] IN ([col1] AS [one], [col2] AS [two], [col3] AS [thr.ee] )
+	OR [b6] IN ('one', 'two', 'thr.ee')
 	OR [b7] IN (NULL)
 	OR [b8] IN (RAND() [col1] > [col2] )
 	OR [b9] IN (RAND(), [col1] > [col2] )
@@ -395,9 +403,9 @@ WHERE ([test.a] LIKE %d', '1995-03-01', '
 	OR [b10] IN (', [], ")
 	AND [c] = 'embedded '' string'
 	OR [d]=%i", 10.3, '
-	OR [e]=%i', NULL, '
-	OR [true]=', TRUE, '
-	OR [false]=', FALSE, '
+	OR [e]=%i', null, '
+	OR [true]=', true, '
+	OR [false]=', false, '
 	OR [str_null]=%sn', '', '
 	OR [str_not_null]=%sn', 'hello', '
 LIMIT 10')
@@ -439,7 +447,7 @@ Assert::same(
 
 
 $where = [
-		'tablename.column' => 1,
+	'tablename.column' => 1,
 ];
 Assert::same(
 	reformat('SELECT * FROM [tablename] WHERE ([tablename].[column] = 1)'),
@@ -449,7 +457,7 @@ Assert::same(
 
 Assert::same(
 	reformat('SELECT FROM ... '),
-	$conn->translate('SELECT FROM ... %lmt', NULL)
+	$conn->translate('SELECT FROM ... %lmt', null)
 );
 
 Assert::same(
@@ -466,41 +474,57 @@ Assert::same(
 Assert::same(
 	reformat('INSERT INTO [products] ([product_id], [title]) VALUES (1, SHA1(\'Test product\')) , (1, SHA1(\'Test product\'))'),
 	$conn->translate('INSERT INTO [products]', [
-	'product_id' => 1,
-	'title' => ['SHA1(%s)', 'Test product'],
-], [
-	'product_id' => 1,
-	'title' => ['SHA1(%s)', 'Test product'],
-])
+		'product_id' => 1,
+		'title' => new Dibi\Expression('SHA1(%s)', 'Test product'),
+	], [
+		'product_id' => 1,
+		'title' => new Dibi\Expression('SHA1(%s)', 'Test product'),
+	])
 );
 
 Assert::same(
 	reformat('UPDATE [products] [product_id]=1, [title]=SHA1(\'Test product\')'),
 	$conn->translate('UPDATE [products]', [
-	'product_id' => 1,
-	'title' => ['SHA1(%s)', 'Test product'],
-])
+		'product_id' => 1,
+		'title' => new Dibi\Expression('SHA1(%s)', 'Test product'),
+	])
+);
+
+Assert::same(
+	reformat('UPDATE [products] [product_id]=1, [title]=SHA1(\'Test product\')'),
+	$conn->translate('UPDATE [products]', [
+		'product_id' => 1,
+		'title' => new Dibi\Expression('SHA1(%s)', 'Test product'),
+	])
+);
+
+Assert::same(
+	reformat('SELECT * FROM [products] WHERE [product_id]=1, [title]=SHA1(\'Test product\')'),
+	$conn->translate('SELECT * FROM [products] WHERE', [
+		'product_id' => 1,
+		'title' => new Dibi\Expression('SHA1(%s)', 'Test product'),
+	])
 );
 
 
 $e = Assert::exception(function () use ($conn) {
 	$array6 = [
 		'id' => [1, 2, 3, 4],
-		'text' => ['ahoj', 'jak', 'se', ['SUM(%i)', '5']],
+		'text' => ['ahoj', 'jak', 'se', new Dibi\Expression('SUM(%i)', '5')],
 		'num%i' => ['1', ''],
 	];
 	$conn->translate('INSERT INTO test %m', $array6);
-}, 'Dibi\Exception', 'SQL translate error: Multi-insert array "num%i" is different');
+}, Dibi\Exception::class, 'SQL translate error: Multi-insert array "num%i" is different');
 Assert::same('INSERT INTO test **Multi-insert array "num%i" is different**', $e->getSql());
 
 $array6 = [
 	'id' => [1, 2, 3, 4],
-	'text' => ['ahoj', 'jak', 'se', ['SUM(%i)', '5']],
-	'num%i' => ['1', '', 10.3, 1],
+	'text' => ['ahoj', 'jak', 'se', new Dibi\Expression('SUM(%i)', '5')],
+	'num%i' => ['1', '-1', 10.3, 1],
 ];
 
 Assert::same(
-	reformat('INSERT INTO test ([id], [text], [num]) VALUES (1, \'ahoj\', 1), (2, \'jak\', 0), (3, \'se\', 10), (4, SUM(5), 1)'),
+	reformat('INSERT INTO test ([id], [text], [num]) VALUES (1, \'ahoj\', 1), (2, \'jak\', -1), (3, \'se\', 10), (4, SUM(5), 1)'),
 	$conn->translate('INSERT INTO test %m', $array6)
 );
 
@@ -520,10 +544,13 @@ Assert::same(
 	$conn->translate('INSERT INTO [test.*]')
 );
 
-Assert::same(
-	reformat('INSERT INTO 0'),
-	$conn->translate('INSERT INTO %f', 'ahoj')
-);
+Assert::exception(function () use ($conn) {
+	$conn->translate('INSERT INTO %i', 'ahoj');
+}, Dibi\Exception::class, "Expected number, 'ahoj' given.");
+
+Assert::exception(function () use ($conn) {
+	$conn->translate('INSERT INTO %f', 'ahoj');
+}, Dibi\Exception::class, "Expected number, 'ahoj' given.");
 
 
 Assert::same(
@@ -542,17 +569,23 @@ Assert::same(
 );
 
 
-setLocale(LC_ALL, 'czech');
+Assert::same(
+	reformat('SELECT [a].[b] AS [c.d]'),
+	$conn->translate('SELECT %n AS %N', 'a.b', 'c.d')
+);
+
+
+setlocale(LC_ALL, 'czech');
 
 Assert::same(
 	reformat("UPDATE [colors] SET [color]='blue', [price]=-12.4, [spec]=-9E-005, [spec2]=1000, [spec3]=10000, [spec4]=10000 WHERE [price]=123.5"),
 
 	$conn->translate('UPDATE [colors] SET', [
-	'color' => 'blue',
-	'price' => -12.4,
-	'spec%f' => '-9E-005',
-	'spec2%f' => 1000.00,
-	'spec3%i' => 10000,
-	'spec4' => 10000,
-], 'WHERE [price]=%f', 123.5)
+		'color' => 'blue',
+		'price' => -12.4,
+		'spec%f' => '-9E-005',
+		'spec2%f' => 1000.00,
+		'spec3%i' => 10000,
+		'spec4' => 10000,
+	], 'WHERE [price]=%f', 123.5)
 );

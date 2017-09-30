@@ -5,10 +5,13 @@
  * Copyright (c) 2005 David Grudl (https://davidgrudl.com)
  */
 
+declare(strict_types=1);
+
 namespace Dibi\Bridges\Nette;
 
 use Dibi;
 use Nette;
+use Tracy;
 
 
 /**
@@ -16,15 +19,26 @@ use Nette;
  */
 class DibiExtension22 extends Nette\DI\CompilerExtension
 {
+	/** @var bool */
+	private $debugMode;
+
+
+	public function __construct($debugMode = null)
+	{
+		$this->debugMode = $debugMode;
+	}
+
 
 	public function loadConfiguration()
 	{
 		$container = $this->getContainerBuilder();
 		$config = $this->getConfig();
 
-		$useProfiler = isset($config['profiler'])
-			? $config['profiler']
-			: class_exists('Tracy\Debugger') && $container->parameters['debugMode'];
+		if ($this->debugMode === null) {
+			$this->debugMode = $container->parameters['debugMode'];
+		}
+
+		$useProfiler = $config['profiler'] ?? (class_exists(Tracy\Debugger::class) && $this->debugMode);
 
 		unset($config['profiler']);
 
@@ -37,23 +51,22 @@ class DibiExtension22 extends Nette\DI\CompilerExtension
 		}
 
 		$connection = $container->addDefinition($this->prefix('connection'))
-			->setClass('Dibi\Connection', [$config])
-			->setAutowired(isset($config['autowired']) ? $config['autowired'] : TRUE);
+			->setClass(Dibi\Connection::class, [$config])
+			->setAutowired($config['autowired'] ?? true);
 
-		if (class_exists('Tracy\Debugger')) {
+		if (class_exists(Tracy\Debugger::class)) {
 			$connection->addSetup(
 				[new Nette\DI\Statement('Tracy\Debugger::getBlueScreen'), 'addPanel'],
-				[['Dibi\Bridges\Tracy\Panel', 'renderException']]
+				[[Dibi\Bridges\Tracy\Panel::class, 'renderException']]
 			);
 		}
 		if ($useProfiler) {
 			$panel = $container->addDefinition($this->prefix('panel'))
-				->setClass('Dibi\Bridges\Tracy\Panel', [
-					isset($config['explain']) ? $config['explain'] : TRUE,
-					isset($config['filter']) && $config['filter'] === FALSE ? Dibi\Event::ALL : Dibi\Event::QUERY,
+				->setClass(Dibi\Bridges\Tracy\Panel::class, [
+					$config['explain'] ?? true,
+					isset($config['filter']) && $config['filter'] === false ? Dibi\Event::ALL : Dibi\Event::QUERY,
 				]);
 			$connection->addSetup([$panel, 'register'], [$connection]);
 		}
 	}
-
 }

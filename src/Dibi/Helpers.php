@@ -5,6 +5,8 @@
  * Copyright (c) 2005 David Grudl (https://davidgrudl.com)
  */
 
+declare(strict_types=1);
+
 namespace Dibi;
 
 
@@ -15,17 +17,18 @@ class Helpers
 	/** @var array */
 	private static $types;
 
+
 	/**
 	 * Prints out a syntax highlighted version of the SQL command or Result.
-	 * @param  string|Result
-	 * @param  bool  return output instead of printing it?
-	 * @return string
-	 */
-	public static function dump($sql = NULL, $return = FALSE)
+     * @param string|Result|null $sql
+     * @param bool $return
+     * @return null|string
+     */
+	public static function dump($sql = null, bool $return = false): ?string
 	{
 		ob_start();
 		if ($sql instanceof Result && PHP_SAPI === 'cli') {
-			$hasColors = (substr(getenv('TERM'), 0, 5) === 'xterm');
+			$hasColors = (substr((string) getenv('TERM'), 0, 5) === 'xterm');
 			$maxLen = 0;
 			foreach ($sql as $i => $row) {
 				if ($i === 0) {
@@ -38,7 +41,7 @@ class Helpers
 				echo $hasColors ? "\033[1;37m#row: $i\033[0m\n" : "#row: $i\n";
 				foreach ($row as $col => $val) {
 					$spaces = $maxLen - mb_strlen($col) + 2;
-					echo "$col" . str_repeat(' ', $spaces) .  "$val\n";
+					echo "$col" . str_repeat(' ', $spaces) . "$val\n";
 				}
 				echo "\n";
 			}
@@ -50,14 +53,14 @@ class Helpers
 				if ($i === 0) {
 					echo "\n<table class=\"dump\">\n<thead>\n\t<tr>\n\t\t<th>#row</th>\n";
 					foreach ($row as $col => $foo) {
-						echo "\t\t<th>" . htmlSpecialChars($col) . "</th>\n";
+						echo "\t\t<th>" . htmlspecialchars((string) $col) . "</th>\n";
 					}
 					echo "\t</tr>\n</thead>\n<tbody>\n";
 				}
 
 				echo "\t<tr>\n\t\t<th>", $i, "</th>\n";
 				foreach ($row as $col) {
-					echo "\t\t<td>", htmlSpecialChars($col), "</td>\n";
+					echo "\t\t<td>", htmlspecialchars((string) $col), "</td>\n";
 				}
 				echo "\t</tr>\n";
 			}
@@ -67,7 +70,7 @@ class Helpers
 				: "</tbody>\n</table>\n";
 
 		} else {
-			if ($sql === NULL) {
+			if ($sql === null) {
 				$sql = \dibi::$sql;
 			}
 
@@ -87,7 +90,7 @@ class Helpers
 			// syntax highlight
 			$highlighter = "#(/\\*.+?\\*/)|(\\*\\*.+?\\*\\*)|(?<=[\\s,(])($keywords1)(?=[\\s,)])|(?<=[\\s,(=])($keywords2)(?=[\\s,)=])#is";
 			if (PHP_SAPI === 'cli') {
-				if (substr(getenv('TERM'), 0, 5) === 'xterm') {
+				if (substr((string) getenv('TERM'), 0, 5) === 'xterm') {
 					$sql = preg_replace_callback($highlighter, function ($m) {
 						if (!empty($m[1])) { // comment
 							return "\033[1;30m" . $m[1] . "\033[0m";
@@ -106,7 +109,7 @@ class Helpers
 				echo trim($sql) . "\n\n";
 
 			} else {
-				$sql = htmlSpecialChars($sql);
+				$sql = htmlspecialchars($sql);
 				$sql = preg_replace_callback($highlighter, function ($m) {
 					if (!empty($m[1])) { // comment
 						return '<em style="color:gray">' . $m[1] . '</em>';
@@ -129,18 +132,18 @@ class Helpers
 			return ob_get_clean();
 		} else {
 			ob_end_flush();
+			return null;
 		}
 	}
 
 
 	/**
 	 * Finds the best suggestion.
-	 * @return string|NULL
 	 * @internal
 	 */
-	public static function getSuggestion(array $items, $value)
+	public static function getSuggestion(array $items, $value): ?string
 	{
-		$best = NULL;
+		$best = null;
 		$min = (strlen($value) / 4 + 1) * 10 + .1;
 		foreach (array_unique($items, SORT_REGULAR) as $item) {
 			$item = is_object($item) ? $item->getName() : $item;
@@ -177,11 +180,9 @@ class Helpers
 
 	/**
 	 * Heuristic type detection.
-	 * @param  string
-	 * @return string|NULL
 	 * @internal
 	 */
-	public static function detectType($type)
+	public static function detectType(string $type): ?string
 	{
 		static $patterns = [
 			'^_' => Type::ARRAY_TYPE, // PostgreSQL arrays
@@ -202,7 +203,7 @@ class Helpers
 				return $val;
 			}
 		}
-		return NULL;
+		return null;
 	}
 
 
@@ -211,7 +212,7 @@ class Helpers
 	 */
 	public static function getTypeCache()
 	{
-		if (self::$types === NULL) {
+		if (self::$types === null) {
 			self::$types = new HashMap([__CLASS__, 'detectType']);
 		}
 		return self::$types;
@@ -220,16 +221,12 @@ class Helpers
 
 	/**
 	 * Apply configuration alias or default values.
-	 * @param  array  connect configuration
-	 * @param  string key
-	 * @param  string alias key
-	 * @return void
 	 */
-	public static function alias(& $config, $key, $alias)
+	public static function alias(array &$config, string $key, string $alias): void
 	{
-		$foo = & $config;
+		$foo = &$config;
 		foreach (explode('|', $key) as $key) {
-			$foo = & $foo[$key];
+			$foo = &$foo[$key];
 		}
 
 		if (!isset($foo) && isset($config[$alias])) {
@@ -243,7 +240,7 @@ class Helpers
 	 * Import SQL dump from file.
 	 * @return int  count of sql commands
 	 */
-	public static function loadFromFile(Connection $connection, $file)
+	public static function loadFromFile(Connection $connection, $file, callable $onProgress = null): int
 	{
 		@set_time_limit(0); // intentionally @
 
@@ -252,192 +249,228 @@ class Helpers
 			throw new \RuntimeException("Cannot open file '$file'.");
 		}
 
-		$count = 0;
+		$stat = fstat($handle);
+		$count = $size = 0;
 		$delimiter = ';';
 		$sql = '';
 		$driver = $connection->getDriver();
-		while (!feof($handle)) {
-			$s = rtrim(fgets($handle));
-			if (substr($s, 0, 10) === 'DELIMITER ') {
-				$delimiter = substr($s, 10);
+		while (($s = fgets($handle)) !== false) {
+			$size += strlen($s);
+			if (strtoupper(substr($s, 0, 10)) === 'DELIMITER ') {
+				$delimiter = trim(substr($s, 10));
 
-			} elseif (substr($s, -strlen($delimiter)) === $delimiter) {
-				$sql .= substr($s, 0, -strlen($delimiter));
+			} elseif (substr($ts = rtrim($s), -strlen($delimiter)) === $delimiter) {
+				$sql .= substr($ts, 0, -strlen($delimiter));
 				$driver->query($sql);
 				$sql = '';
 				$count++;
+				if ($onProgress) {
+					$onProgress($count, isset($stat['size']) ? $size * 100 / $stat['size'] : null);
+				}
 
 			} else {
-				$sql .= $s . "\n";
+				$sql .= $s;
 			}
 		}
-		if (trim($sql) !== '') {
+
+		if (rtrim($sql) !== '') {
 			$driver->query($sql);
 			$count++;
+			if ($onProgress) {
+				$onProgress($count, isset($stat['size']) ? 100 : null);
+			}
 		}
 		fclose($handle);
 		return $count;
 	}
 
-	/**
-	 * Parses PostgreSQL Array Type into PHP Array
-	 *
-	 * Source: http://stackoverflow.com/questions/3068683/convert-postgresql-array-to-php-array
-	 *
-	 * @param $s
-	 * @param int $start
-	 * @param null $end
-	 * @return array|null
+    /**
+	 * @internal
 	 */
-	public static function pgArrayParse($s, $start=0, &$end=NULL)
+	public static function false2Null($val)
 	{
-		if (empty($s) || $s[0]!='{') return NULL;
-		$return = array();
-		$string = false;
-		$quote='';
-		$len = strlen($s);
-		$v = '';
-		for($i = $start + 1; $i < $len; $i++) {
-			$ch = $s[$i];
-
-			if (!$string && $ch == '}'){
-				if ($v !== '' || !empty($return)) {
-					$return[] = $v;
-				}
-				$end = $i;
-				break;
-			} elseif (!$string && $ch == '{') {
-				$v = static::pgArrayParse($s, $i, $i);
-			} elseif (!$string && $ch == ','){
-				$return[] = $v;
-				$v = '';
-			} elseif (!$string && ($ch == '"' || $ch == "'")) {
-				$string = TRUE;
-				$quote = $ch;
-			} elseif ($string && $ch == $quote && $s[$i-1] == "\\") {
-				$v = substr($v,0,-1).$ch;
-			} elseif ($string && $ch == $quote && $s[$i-1] != "\\") {
-				$string = FALSE;
-			} else {
-				$v .= $ch;
-			}
-		}
-		return $return;
+		return $val === false ? null : $val;
 	}
 
-	/**
-	 * Converts a php array into a postgres array (also multidimensional)
-	 *
-	 * Each element is escaped using pg_escape_string, only string values
-	 * are enclosed within single quotes, numeric values no; special
-	 * elements as php nulls or booleans are literally converted, so the
-	 * php NULL value is written literally 'NULL' and becomes a postgres
-	 * NULL (the same thing is done with TRUE and FALSE values).
-	 *
-	 * Source: http://stackoverflow.com/questions/5631387/php-array-to-postgres-array
-	 *
-	 * Examples :
-	 * VARCHAR VERY BASTARD ARRAY :
-	 *    $input = array('bla bla', 'ehi "hello"', 'abc, def', ' \'VERY\' "BASTARD,\'value"', NULL);
-	 *
-	 *    Helpers::pgArrayCreate($input) ==>> 'ARRAY['bla bla','ehi "hello"','abc, def',' ''VERY'' "BASTARD,''value"',NULL]'
-	 *
-	 *    try to put this value in a query (you will get a valid result):
-	 *    select unnest(ARRAY['bla bla','ehi "hello"','abc, def',' ''VERY'' "BASTARD,''value"',NULL]::varchar[])
-	 *
-	 * NUMERIC ARRAY:
-	 *    $input = array(1, 2, 3, 8.5, null, 7.32);
-	 *    Helpers::pgArrayCreate($input) ==>> 'ARRAY[1,2,3,8.5,NULL,7.32]'
-	 *    try: select unnest(ARRAY[1,2,3,8.5,NULL,7.32]::numeric[])
-	 *
-	 * BOOLEAN ARRAY:
-	 *    $input = array(false, true, true, null);
-	 *    Helpers::pgArrayCreate($input) ==>> 'ARRAY[FALSE,TRUE,TRUE,NULL]'
-	 *    try: select unnest(ARRAY[FALSE,TRUE,TRUE,NULL]::boolean[])
-	 *
-	 * MULTIDIMENSIONAL ARRAY:
-	 *    $input = array(array('abc', 'def'), array('ghi', 'jkl'));
-	 *    Helpers::pgArrayCreate($input) ==>> 'ARRAY[ARRAY['abc','def'],ARRAY['ghi','jkl']]'
-	 *    try: select ARRAY[ARRAY['abc','def'],ARRAY['ghi','jkl']]::varchar[][]
-	 *
-	 * EMPTY ARRAY (is different than null!!!):
-	 *    $input = array();
-	 *    Helpers::pgArrayCreate($input) ==>> 'ARRAY[]'
-	 *    try: select unnest(ARRAY[]::varchar[])
-	 *
-	 * NULL VALUE :
-	 *    $input = NULL;
-	 *    Helpers::pgArrayCreate($input) ==>> 'NULL'
-	 *    the functions returns a string='NULL' (literally 'NULL'), so putting it
-	 *    in the query, it becomes a postgres null value.
-	 *
-	 * If you pass a value that is not an array, the function returns a literal 'NULL'.
-	 *
-	 * You should put the result of this functions directly inside a query,
-	 * without quoting or escaping it and you cannot use this result as parameter
-	 * of a prepared statement.
-	 *
-	 * Example:
-	 * $q = 'INSERT INTO foo (field1, field_array) VALUES ($1, ' . Helpers::pgArrayCreate($php_array) . '::varchar[])';
-	 * $params = array('scalar_parameter');
-	 *
-	 * It is recommended to write the array type (ex. varchar[], numeric[], ...)
-	 * because if the array is empty or contains only null values, postgres
-	 * can give an error (cannot determine type of an empty array...)
-	 *
-	 * The function returns only a syntactically well-formed array, it does not
-	 * make any logical check, you should consider that postgres gives errors
-	 * if you mix different types (ex. numeric and text) or different dimensions
-	 * in a multidim array.
-	 *
-	 * @param array $set PHP array
-	 *
-	 * @return string Array in postgres syntax
-	 */
-	public static function pgArrayCreate($set) {
 
-		if (is_null($set) || !is_array($set)) {
-			return 'NULL';
-		}
+    /**
+     * @internal
+     * @param $value
+     * @return string|int
+     * @throws Exception
+     */
+    public static function intVal($value): int
+    {
+        if (is_int($value)) {
+            return $value;
+        } elseif (is_string($value) && preg_match('#-?\d++\z#A', $value)) {
+            if (is_float($value * 1)) {
+                throw new Exception("Number $value is greater than integer.");
+            }
+            return (int) $value;
+        } else {
+            throw new Exception("Expected number, '$value' given.");
+        }
+    }
 
-		// can be called with a scalar or array
-		settype($set, 'array');
+    /**
+     * Parses PostgreSQL Array Type into PHP Array
+     *
+     * Source: http://stackoverflow.com/questions/3068683/convert-postgresql-array-to-php-array
+     *
+     * @param $s
+     * @param int $start
+     * @param null $end
+     * @return array|null
+     */
+    public static function pgArrayParse($s, $start=0, &$end=NULL)
+    {
+        if (empty($s) || $s[0]!='{') return NULL;
+        $return = array();
+        $string = false;
+        $quote='';
+        $len = strlen($s);
+        $v = '';
+        for($i = $start + 1; $i < $len; $i++) {
+            $ch = $s[$i];
 
-		$result = array();
-		foreach ($set as $t) {
-			// Element is array : recursion
-			if (is_array($t)) {
-				$result[] = static::pgArrayCreate($t);
-			}
-			else {
-				// PHP NULL
-				if (is_null($t)) {
-					$result[] = 'NULL';
-				}
-				// PHP TRUE::boolean
-				elseif (is_bool($t) && $t == TRUE) {
-					$result[] = 'TRUE';
-				}
-				// PHP FALSE::boolean
-				elseif (is_bool($t) && $t == FALSE) {
-					$result[] = 'FALSE';
-				}
-				// Other scalar value
-				else {
-					// Escape
-					$t = pg_escape_string($t);
+            if (!$string && $ch == '}'){
+                if ($v !== '' || !empty($return)) {
+                    $return[] = $v;
+                }
+                $end = $i;
+                break;
+            } elseif (!$string && $ch == '{') {
+                $v = static::pgArrayParse($s, $i, $i);
+            } elseif (!$string && $ch == ','){
+                $return[] = $v;
+                $v = '';
+            } elseif (!$string && ($ch == '"' || $ch == "'")) {
+                $string = TRUE;
+                $quote = $ch;
+            } elseif ($string && $ch == $quote && $s[$i-1] == "\\") {
+                $v = substr($v,0,-1).$ch;
+            } elseif ($string && $ch == $quote && $s[$i-1] != "\\") {
+                $string = FALSE;
+            } else {
+                $v .= $ch;
+            }
+        }
+        return $return;
+    }
 
-					// quote only non-numeric values
-					if (!is_numeric($t)) {
-						$t = '"' . $t . '"';
-						//$t = $t;
-					}
-					$result[] = $t;
-				}
-			}
-		}
-		return '{' . implode(",", $result) . '}'; // PostgeSQL format
-		//return 'ARRAY[' . implode(",", $result) . ']'; // ANSI format
-	}
+    /**
+     * Converts a php array into a postgres array (also multidimensional)
+     *
+     * Each element is escaped using pg_escape_string, only string values
+     * are enclosed within single quotes, numeric values no; special
+     * elements as php nulls or booleans are literally converted, so the
+     * php NULL value is written literally 'NULL' and becomes a postgres
+     * NULL (the same thing is done with TRUE and FALSE values).
+     *
+     * Source: http://stackoverflow.com/questions/5631387/php-array-to-postgres-array
+     *
+     * Examples :
+     * VARCHAR VERY BASTARD ARRAY :
+     *    $input = array('bla bla', 'ehi "hello"', 'abc, def', ' \'VERY\' "BASTARD,\'value"', NULL);
+     *
+     *    Helpers::pgArrayCreate($input) ==>> 'ARRAY['bla bla','ehi "hello"','abc, def',' ''VERY'' "BASTARD,''value"',NULL]'
+     *
+     *    try to put this value in a query (you will get a valid result):
+     *    select unnest(ARRAY['bla bla','ehi "hello"','abc, def',' ''VERY'' "BASTARD,''value"',NULL]::varchar[])
+     *
+     * NUMERIC ARRAY:
+     *    $input = array(1, 2, 3, 8.5, null, 7.32);
+     *    Helpers::pgArrayCreate($input) ==>> 'ARRAY[1,2,3,8.5,NULL,7.32]'
+     *    try: select unnest(ARRAY[1,2,3,8.5,NULL,7.32]::numeric[])
+     *
+     * BOOLEAN ARRAY:
+     *    $input = array(false, true, true, null);
+     *    Helpers::pgArrayCreate($input) ==>> 'ARRAY[FALSE,TRUE,TRUE,NULL]'
+     *    try: select unnest(ARRAY[FALSE,TRUE,TRUE,NULL]::boolean[])
+     *
+     * MULTIDIMENSIONAL ARRAY:
+     *    $input = array(array('abc', 'def'), array('ghi', 'jkl'));
+     *    Helpers::pgArrayCreate($input) ==>> 'ARRAY[ARRAY['abc','def'],ARRAY['ghi','jkl']]'
+     *    try: select ARRAY[ARRAY['abc','def'],ARRAY['ghi','jkl']]::varchar[][]
+     *
+     * EMPTY ARRAY (is different than null!!!):
+     *    $input = array();
+     *    Helpers::pgArrayCreate($input) ==>> 'ARRAY[]'
+     *    try: select unnest(ARRAY[]::varchar[])
+     *
+     * NULL VALUE :
+     *    $input = NULL;
+     *    Helpers::pgArrayCreate($input) ==>> 'NULL'
+     *    the functions returns a string='NULL' (literally 'NULL'), so putting it
+     *    in the query, it becomes a postgres null value.
+     *
+     * If you pass a value that is not an array, the function returns a literal 'NULL'.
+     *
+     * You should put the result of this functions directly inside a query,
+     * without quoting or escaping it and you cannot use this result as parameter
+     * of a prepared statement.
+     *
+     * Example:
+     * $q = 'INSERT INTO foo (field1, field_array) VALUES ($1, ' . Helpers::pgArrayCreate($php_array) . '::varchar[])';
+     * $params = array('scalar_parameter');
+     *
+     * It is recommended to write the array type (ex. varchar[], numeric[], ...)
+     * because if the array is empty or contains only null values, postgres
+     * can give an error (cannot determine type of an empty array...)
+     *
+     * The function returns only a syntactically well-formed array, it does not
+     * make any logical check, you should consider that postgres gives errors
+     * if you mix different types (ex. numeric and text) or different dimensions
+     * in a multidim array.
+     *
+     * @param array $set PHP array
+     *
+     * @return string Array in postgres syntax
+     */
+    public static function pgArrayCreate($set) {
 
+        if (is_null($set) || !is_array($set)) {
+            return 'NULL';
+        }
+
+        // can be called with a scalar or array
+        settype($set, 'array');
+
+        $result = array();
+        foreach ($set as $t) {
+            // Element is array : recursion
+            if (is_array($t)) {
+                $result[] = static::pgArrayCreate($t);
+            }
+            else {
+                // PHP NULL
+                if (is_null($t)) {
+                    $result[] = 'NULL';
+                }
+                // PHP TRUE::boolean
+                elseif (is_bool($t) && $t == TRUE) {
+                    $result[] = 'TRUE';
+                }
+                // PHP FALSE::boolean
+                elseif (is_bool($t) && $t == FALSE) {
+                    $result[] = 'FALSE';
+                }
+                // Other scalar value
+                else {
+                    // Escape
+                    $t = pg_escape_string($t);
+
+                    // quote only non-numeric values
+                    if (!is_numeric($t)) {
+                        $t = '"' . $t . '"';
+                        //$t = $t;
+                    }
+                    $result[] = $t;
+                }
+            }
+        }
+        return '{' . implode(",", $result) . '}'; // PostgeSQL format
+        //return 'ARRAY[' . implode(",", $result) . ']'; // ANSI format
+    }
 }

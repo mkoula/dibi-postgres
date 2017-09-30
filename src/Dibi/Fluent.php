@@ -5,6 +5,8 @@
  * Copyright (c) 2005 David Grudl (https://davidgrudl.com)
  */
 
+declare(strict_types=1);
+
 namespace Dibi;
 
 use Dibi\Drivers\PostgreDriver;
@@ -27,6 +29,7 @@ use Dibi\Drivers\PostgreDriver;
  * @method Fluent innerJoin(...$table)
  * @method Fluent rightJoin(...$table)
  * @method Fluent outerJoin(...$table)
+ * @method Fluent as(...$field)
  * @method Fluent on(...$cond)
  * @method Fluent using(...$cond)
  * @method Fluent returning(...$field)
@@ -35,7 +38,7 @@ class Fluent implements IDataSource
 {
 	use Strict;
 
-	const REMOVE = FALSE;
+	public const REMOVE = false;
 
 	/** @var array */
 	public static $masks = [
@@ -68,11 +71,11 @@ class Fluent implements IDataSource
 		'GROUP BY' => ',',
 		'HAVING' => 'AND',
 		'ORDER BY' => ',',
-		'LIMIT' => FALSE,
-		'OFFSET' => FALSE,
+		'LIMIT' => false,
+		'OFFSET' => false,
 		'SET' => ',',
 		'VALUES' => ',',
-		'INTO' => FALSE,
+		'INTO' => false,
 		'RETURNING' => ',',
 	];
 
@@ -106,14 +109,11 @@ class Fluent implements IDataSource
 	private static $normalizer;
 
 
-	/**
-	 * @param  Connection
-	 */
 	public function __construct(Connection $connection)
 	{
 		$this->connection = $connection;
 
-		if (self::$normalizer === NULL) {
+		if (self::$normalizer === null) {
 			self::$normalizer = new HashMap([__CLASS__, '_formatClause']);
 		}
 	}
@@ -121,42 +121,39 @@ class Fluent implements IDataSource
 
 	/**
 	 * Appends new argument to the clause.
-	 * @param  string clause name
-	 * @param  array  arguments
-	 * @return self
 	 */
-	public function __call($clause, $args)
+	public function __call(string $clause, array $args): self
 	{
 		$clause = self::$normalizer->$clause;
 
 		// lazy initialization
-		if ($this->command === NULL) {
+		if ($this->command === null) {
 			if (isset(self::$masks[$clause])) {
-				$this->clauses = array_fill_keys(self::$masks[$clause], NULL);
+				$this->clauses = array_fill_keys(self::$masks[$clause], null);
 			}
-			$this->cursor = & $this->clauses[$clause];
+			$this->cursor = &$this->clauses[$clause];
 			$this->cursor = [];
 			$this->command = $clause;
 		}
 
 		// auto-switch to a clause
 		if (isset(self::$clauseSwitches[$clause])) {
-			$this->cursor = & $this->clauses[self::$clauseSwitches[$clause]];
+			$this->cursor = &$this->clauses[self::$clauseSwitches[$clause]];
 		}
 
 		if (array_key_exists($clause, $this->clauses)) {
 			// append to clause
-			$this->cursor = & $this->clauses[$clause];
+			$this->cursor = &$this->clauses[$clause];
 
 			// TODO: really delete?
 			if ($args === [self::REMOVE]) {
-				$this->cursor = NULL;
+				$this->cursor = null;
 				return $this;
 			}
 
 			if (isset(self::$separators[$clause])) {
 				$sep = self::$separators[$clause];
-				if ($sep === FALSE) { // means: replace
+				if ($sep === false) { // means: replace
 					$this->cursor = [];
 
 				} elseif (!empty($this->cursor)) {
@@ -173,19 +170,19 @@ class Fluent implements IDataSource
 			$this->cursor[] = $clause;
 		}
 
-		if ($this->cursor === NULL) {
+		if ($this->cursor === null) {
 			$this->cursor = [];
 		}
 
 		// special types or argument
 		if (count($args) === 1) {
 			$arg = $args[0];
-			// TODO: really ignore TRUE?
-			if ($arg === TRUE) { // flag
+			// TODO: really ignore true?
+			if ($arg === true) { // flag
 				return $this;
 
 			} elseif (is_string($arg) && preg_match('#^[a-z:_][a-z0-9_.:]*\z#i', $arg)) { // identifier
-				$args = ['%n', $arg];
+				$args = [$clause === 'AS' ? '%N' : '%n', $arg];
 
 			} elseif (is_array($arg) || ($arg instanceof \Traversable && !$arg instanceof self)) { // any array
 				if (isset(self::$modifiers[$clause])) {
@@ -194,7 +191,7 @@ class Fluent implements IDataSource
 				} elseif (is_string(key($arg))) { // associative array
 					$args = ['%a', $arg];
 				}
-			} // case $arg === FALSE is handled above
+			} // case $arg === false is handled above
 		}
 
 		foreach ($args as $arg) {
@@ -210,13 +207,11 @@ class Fluent implements IDataSource
 
 	/**
 	 * Switch to a clause.
-	 * @param  string clause name
-	 * @return self
 	 */
-	public function clause($clause)
+	public function clause(string $clause): self
 	{
-		$this->cursor = & $this->clauses[self::$normalizer->$clause];
-		if ($this->cursor === NULL) {
+		$this->cursor = &$this->clauses[self::$normalizer->$clause];
+		if ($this->cursor === null) {
 			$this->cursor = [];
 		}
 
@@ -226,27 +221,22 @@ class Fluent implements IDataSource
 
 	/**
 	 * Removes a clause.
-	 * @param  string clause name
-	 * @return self
 	 */
-	public function removeClause($clause)
+	public function removeClause(string $clause): self
 	{
-		$this->clauses[self::$normalizer->$clause] = NULL;
+		$this->clauses[self::$normalizer->$clause] = null;
 		return $this;
 	}
 
 
 	/**
 	 * Change a SQL flag.
-	 * @param  string  flag name
-	 * @param  bool  value
-	 * @return self
 	 */
-	public function setFlag($flag, $value = TRUE)
+	public function setFlag(string $flag, bool $value = true): self
 	{
 		$flag = strtoupper($flag);
 		if ($value) {
-			$this->flags[$flag] = TRUE;
+			$this->flags[$flag] = true;
 		} else {
 			unset($this->flags[$flag]);
 		}
@@ -256,10 +246,8 @@ class Fluent implements IDataSource
 
 	/**
 	 * Is a flag set?
-	 * @param  string  flag name
-	 * @return bool
 	 */
-	final public function getFlag($flag)
+	final public function getFlag(string $flag): bool
 	{
 		return isset($this->flags[strtoupper($flag)]);
 	}
@@ -267,9 +255,8 @@ class Fluent implements IDataSource
 
 	/**
 	 * Returns SQL command.
-	 * @return string
 	 */
-	final public function getCommand()
+	final public function getCommand(): string
 	{
 		return $this->command;
 	}
@@ -277,9 +264,8 @@ class Fluent implements IDataSource
 
 	/**
 	 * Returns the dibi connection.
-	 * @return Connection
 	 */
-	final public function getConnection()
+	final public function getConnection(): Connection
 	{
 		return $this->connection;
 	}
@@ -287,11 +273,9 @@ class Fluent implements IDataSource
 
 	/**
 	 * Adds Result setup.
-	 * @param  string  method
 	 * @param  mixed   args
-	 * @return self
 	 */
-	public function setupResult($method)
+	public function setupResult(string $method): self
 	{
 		$this->setups[] = func_get_args();
 		return $this;
@@ -304,10 +288,10 @@ class Fluent implements IDataSource
 	/**
 	 * Generates and executes SQL query.
 	 * @param  mixed what to return?
-	 * @return Result|int  result set object (if any)
+	 * @return Result|int  result set or number of affected rows
 	 * @throws Exception
 	 */
-	public function execute($return = NULL)
+	public function execute($return = null)
 	{
 		$res = $this->query($this->_export());
 		switch ($return) {
@@ -323,12 +307,12 @@ class Fluent implements IDataSource
 
 	/**
 	 * Generates, executes SQL query and fetches the single row.
-	 * @return Row|FALSE  array on success, FALSE if no next record
+	 * @return Row|NULL
 	 */
 	public function fetch()
 	{
 		if ($this->command === 'SELECT' && !$this->clauses['LIMIT']) {
-			return $this->query($this->_export(NULL, ['%lmt', 1]))->fetch();
+			return $this->query($this->_export(null, ['%lmt', 1]))->fetch();
 		} else {
 			return $this->query($this->_export())->fetch();
 		}
@@ -337,12 +321,12 @@ class Fluent implements IDataSource
 
 	/**
 	 * Like fetch(), but returns only first field.
-	 * @return mixed  value on success, FALSE if no next record
+	 * @return mixed  value on success, null if no next record
 	 */
 	public function fetchSingle()
 	{
 		if ($this->command === 'SELECT' && !$this->clauses['LIMIT']) {
-			return $this->query($this->_export(NULL, ['%lmt', 1]))->fetchSingle();
+			return $this->query($this->_export(null, ['%lmt', 1]))->fetchSingle();
 		} else {
 			return $this->query($this->_export())->fetchSingle();
 		}
@@ -351,22 +335,18 @@ class Fluent implements IDataSource
 
 	/**
 	 * Fetches all records from table.
-	 * @param  int  offset
-	 * @param  int  limit
-	 * @return array
 	 */
-	public function fetchAll($offset = NULL, $limit = NULL)
+	public function fetchAll(int $offset = null, int $limit = null): array
 	{
-		return $this->query($this->_export(NULL, ['%ofs %lmt', $offset, $limit]))->fetchAll();
+		return $this->query($this->_export(null, ['%ofs %lmt', $offset, $limit]))->fetchAll();
 	}
 
 
 	/**
 	 * Fetches all records from table and returns associative tree.
 	 * @param  string  associative descriptor
-	 * @return array
 	 */
-	public function fetchAssoc($assoc)
+	public function fetchAssoc(string $assoc): array
 	{
 		return $this->query($this->_export())->fetchAssoc($assoc);
 	}
@@ -375,10 +355,8 @@ class Fluent implements IDataSource
 	/**
 	 * Fetches all records from table like $key => $value pairs.
 	 * @param  string  associative key
-	 * @param  string  value
-	 * @return array
 	 */
-	public function fetchPairs($key = NULL, $value = NULL)
+	public function fetchPairs(string $key = null, string $value = null): array
 	{
 		return $this->query($this->_export())->fetchPairs($key, $value);
 	}
@@ -386,46 +364,40 @@ class Fluent implements IDataSource
 
 	/**
 	 * Required by the IteratorAggregate interface.
-	 * @param  int  offset
-	 * @param  int  limit
-	 * @return ResultIterator
 	 */
-	public function getIterator($offset = NULL, $limit = NULL)
+	public function getIterator(int $offset = null, int $limit = null): ResultIterator
 	{
-		return $this->query($this->_export(NULL, ['%ofs %lmt', $offset, $limit]))->getIterator();
+		return $this->query($this->_export(null, ['%ofs %lmt', $offset, $limit]))->getIterator();
 	}
 
 
 	/**
 	 * Generates and prints SQL query or it's part.
 	 * @param  string clause name
-	 * @return bool
 	 */
-	public function test($clause = NULL)
+	public function test(string $clause = null): bool
 	{
 		return $this->connection->test($this->_export($clause));
 	}
 
 
-	/**
-	 * @return int
-	 */
-	public function count()
+	public function count(): int
 	{
-		return (int) $this->query([
+		return Helpers::intVal($this->query([
 			'SELECT COUNT(*) FROM (%ex', $this->_export(), ') [data]',
-		])->fetchSingle();
+		])->fetchSingle());
 	}
 
 
 	/**
-	 * @return Result
+	 * @return Result|int
 	 */
 	private function query($args)
 	{
 		$res = $this->connection->query($args);
 		foreach ($this->setups as $setup) {
-			call_user_func_array([$res, array_shift($setup)], $setup);
+			$method = array_shift($setup);
+			$res->$method(...$setup);
 		}
 		return $res;
 	}
@@ -434,10 +406,7 @@ class Fluent implements IDataSource
 	/********************* exporting ****************d*g**/
 
 
-	/**
-	 * @return DataSource
-	 */
-	public function toDataSource()
+	public function toDataSource(): DataSource
 	{
 		return new DataSource($this->connection->translate($this->_export()), $this->connection);
 	}
@@ -445,14 +414,14 @@ class Fluent implements IDataSource
 
 	/**
 	 * Returns SQL query.
-	 * @return string
 	 */
-	final public function __toString()
+	final public function __toString(): string
 	{
 		try {
 			return $this->connection->translate($this->_export());
-		} catch (\Exception $e) {
+		} catch (\Throwable $e) {
 			trigger_error($e->getMessage(), E_USER_ERROR);
+			return '';
 		}
 	}
 
@@ -460,11 +429,10 @@ class Fluent implements IDataSource
 	/**
 	 * Generates parameters for Translator.
 	 * @param  string clause name
-	 * @return array
 	 */
-	protected function _export($clause = NULL, $args = [])
+	protected function _export(string $clause = null, array $args = []): array
 	{
-		if ($clause === NULL) {
+		if ($clause === null) {
 			$data = $this->clauses;
 			if ($this->command === 'SELECT' && ($data['LIMIT'] || $data['OFFSET'])) {
 				$args = array_merge(['%lmt %ofs', $data['LIMIT'][0], $data['OFFSET'][0]], $args);
@@ -481,11 +449,13 @@ class Fluent implements IDataSource
 		}
 
 		foreach ($data as $clause => $statement) {
+
 			if ($clause === 'RETURNING' && !($this->connection->getDriver() instanceof PostgreDriver)) {
 				throw new NotSupportedException('RETURNING clause is supported only in PostgreSQL');
 			}
 
 			if ($statement !== NULL) {
+
 				$args[] = $clause;
 				if ($clause === $this->command && $this->flags) {
 					$args[] = implode(' ', array_keys($this->flags));
@@ -502,11 +472,9 @@ class Fluent implements IDataSource
 
 	/**
 	 * Format camelCase clause name to UPPER CASE.
-	 * @param  string
-	 * @return string
 	 * @internal
 	 */
-	public static function _formatClause($s)
+	public static function _formatClause(string $s): string
 	{
 		if ($s === 'order' || $s === 'group') {
 			$s .= 'By';
@@ -520,10 +488,9 @@ class Fluent implements IDataSource
 	{
 		// remove references
 		foreach ($this->clauses as $clause => $val) {
-			$this->clauses[$clause] = & $val;
+			$this->clauses[$clause] = &$val;
 			unset($val);
 		}
-		$this->cursor = & $foo;
+		$this->cursor = &$foo;
 	}
-
 }

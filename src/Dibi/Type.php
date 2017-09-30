@@ -5,6 +5,8 @@
  * Copyright (c) 2005 David Grudl (https://davidgrudl.com)
  */
 
+declare(strict_types=1);
+
 namespace Dibi;
 
 
@@ -13,7 +15,7 @@ namespace Dibi;
  */
 class Type
 {
-	const
+	public const
 		TEXT = 's', // as 'string'
 		BINARY = 'bin',
 		BOOL = 'b',
@@ -27,9 +29,9 @@ class Type
 		JSON = 'j',
 		JSONB = 'jb';
 
+
 	final public function __construct()
 	{
 		throw new \LogicException('Cannot instantiate static class ' . __CLASS__);
 	}
-
 }

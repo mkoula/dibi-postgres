@@ -5,6 +5,8 @@
  * Copyright (c) 2005 David Grudl (https://davidgrudl.com)
  */
 
+declare(strict_types=1);
+
 namespace Dibi;
 
 
@@ -33,7 +35,6 @@ abstract class HashMapBase
 	{
 		return $this->callback;
 	}
-
 }
 
 
@@ -44,7 +45,6 @@ abstract class HashMapBase
  */
 final class HashMap extends HashMapBase
 {
-
 	public function __set($nm, $val)
 	{
 		if ($nm == '') {
@@ -58,10 +58,9 @@ final class HashMap extends HashMapBase
 	{
 		if ($nm == '') {
 			$nm = "\xFF";
-			return isset($this->$nm) ? $this->$nm : $this->$nm = call_user_func($this->getCallback(), '');
+			return isset($this->$nm) ? $this->$nm : $this->$nm = $this->getCallback()('');
 		} else {
-			return $this->$nm = call_user_func($this->getCallback(), $nm);
+			return $this->$nm = $this->getCallback()($nm);
 		}
 	}
-
 }

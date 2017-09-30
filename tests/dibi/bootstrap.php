@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 
 // The Nette Tester command-line runner can be
 // invoked through the command: ../../vendor/bin/tester .
@@ -18,7 +19,7 @@ date_default_timezone_set('Europe/Prague');
 try {
 	$config = Tester\Environment::loadData();
 } catch (Exception $e) {
-	$config = parse_ini_file(__DIR__ . '/../databases.ini', TRUE);
+	$config = parse_ini_file(__DIR__ . '/../databases.ini', true);
 	$config = reset($config);
 }
 
@@ -34,13 +35,6 @@ if ($config['system'] === 'odbc') {
 	copy(__DIR__ . '/data/odbc.mdb', TEMP_DIR . '/odbc.mdb');
 	$config['dsn'] = str_replace('data/odbc.mdb', TEMP_DIR . '/odbc.mdb', $config['dsn']);
 }
-
-if ($config['driver'] === 'mysql' && PHP_VERSION_ID >= 70000) {
-	Tester\Environment::skip('mysql driver is not supported on PHP 7');
-}
-
-
-$conn = new Dibi\Connection($config);
 
 
 function test(Closure $function)
@@ -63,7 +57,7 @@ function reformat($s)
 		return strtr($s, '[]', '``');
 	} elseif ($config['system'] === 'postgre') {
 		return strtr($s, '[]', '""');
-	} elseif (in_array($config['system'], ['odbc', 'sqlite', 'sqlsrv'])) {
+	} elseif (in_array($config['system'], ['odbc', 'sqlite', 'sqlsrv'], true)) {
 		return $s;
 	} else {
 		trigger_error("Unsupported driver $config[system]", E_USER_WARNING);
@@ -74,7 +68,7 @@ function reformat($s)
 function num($n)
 {
 	global $config;
-	if (substr(@$config['dsn'], 0, 5) === 'odbc:' || $config['driver'] === 'sqlite') {
+	if (substr($config['dsn'] ?? '', 0, 5) === 'odbc:' || $config['driver'] === 'sqlite') {
 		$n = is_float($n) ? "$n.0" : (string) $n;
 	}
 	return $n;

@@ -1,10 +1,13 @@
+<?php
+declare(strict_types=1);
+?>
 <!DOCTYPE html><link rel="stylesheet" href="data/style.css">
 
 <h1>Query Language & Conditions | dibi</h1>
 
 <?php
 
-require __DIR__ . '/../src/loader.php';
+require __DIR__ . '/../vendor/autoload.php';
 
 
 dibi::connect([
@@ -14,13 +17,13 @@ dibi::connect([
 
 
 // some variables
-$cond1 = TRUE;
-$cond2 = FALSE;
+$cond1 = true;
+$cond2 = false;
 $foo = -1;
 $bar = 2;
 
 // conditional variable
-$name = $cond1 ? 'K%' : NULL;
+$name = $cond1 ? 'K%' : null;
 
 // if & end
 dibi::test('

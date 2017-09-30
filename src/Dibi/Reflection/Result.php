@@ -5,6 +5,8 @@
  * Copyright (c) 2005 David Grudl (https://davidgrudl.com)
  */
 
+declare(strict_types=1);
+
 namespace Dibi\Reflection;
 
 use Dibi;
@@ -39,7 +41,7 @@ class Result
 	/**
 	 * @return Column[]
 	 */
-	public function getColumns()
+	public function getColumns(): array
 	{
 		$this->initColumns();
 		return array_values($this->columns);
@@ -47,10 +49,9 @@ class Result
 
 
 	/**
-	 * @param  bool
 	 * @return string[]
 	 */
-	public function getColumnNames($fullNames = FALSE)
+	public function getColumnNames(bool $fullNames = false): array
 	{
 		$this->initColumns();
 		$res = [];
@@ -61,11 +62,7 @@ class Result
 	}
 
 
-	/**
-	 * @param  string
-	 * @return Column
-	 */
-	public function getColumn($name)
+	public function getColumn(string $name): Column
 	{
 		$this->initColumns();
 		$l = strtolower($name);
@@ -78,29 +75,21 @@ class Result
 	}
 
 
-	/**
-	 * @param  string
-	 * @return bool
-	 */
-	public function hasColumn($name)
+	public function hasColumn(string $name): bool
 	{
 		$this->initColumns();
 		return isset($this->names[strtolower($name)]);
 	}
 
 
-	/**
-	 * @return void
-	 */
-	protected function initColumns()
+	protected function initColumns(): void
 	{
-		if ($this->columns === NULL) {
+		if ($this->columns === null) {
 			$this->columns = [];
-			$reflector = $this->driver instanceof Dibi\Reflector ? $this->driver : NULL;
+			$reflector = $this->driver instanceof Dibi\Reflector ? $this->driver : null;
 			foreach ($this->driver->getResultColumns() as $info) {
 				$this->columns[] = $this->names[strtolower($info['name'])] = new Column($reflector, $info);
 			}
 		}
 	}
-
 }
