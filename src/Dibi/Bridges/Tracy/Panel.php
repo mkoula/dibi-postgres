@@ -1,7 +1,7 @@
 <?php
 
 /**
- * This file is part of the "dibi" - smart database abstraction layer.
+ * This file is part of the Dibi, smart database abstraction layer (https://dibiphp.com)
  * Copyright (c) 2005 David Grudl (https://davidgrudl.com)
  */
 
@@ -25,7 +25,7 @@ class Panel implements Tracy\IBarPanel
 	/** @var int maximum SQL length */
 	public static $maxLength = 1000;
 
-	/** @var bool  explain queries? */
+	/** @var bool|string  explain queries? */
 	public $explain;
 
 	/** @var int */
@@ -35,14 +35,14 @@ class Panel implements Tracy\IBarPanel
 	private $events = [];
 
 
-	public function __construct(bool $explain = true, int $filter = null)
+	public function __construct($explain = true, int $filter = null)
 	{
 		$this->filter = $filter ?: Event::QUERY;
 		$this->explain = $explain;
 	}
 
 
-	public function register(Dibi\Connection $connection)
+	public function register(Dibi\Connection $connection): void
 	{
 		Tracy\Debugger::getBar()->addPanel($this);
 		Tracy\Debugger::getBlueScreen()->addPanel([__CLASS__, 'renderException']);
@@ -65,7 +65,7 @@ class Panel implements Tracy\IBarPanel
 	/**
 	 * Returns blue-screen custom tab.
 	 */
-	public static function renderException($e): ?array
+	public static function renderException(?\Throwable $e): ?array
 	{
 		if ($e instanceof Dibi\Exception && $e->getSql()) {
 			return [
@@ -110,10 +110,10 @@ class Panel implements Tracy\IBarPanel
 			$connection = $event->connection;
 			$explain = null; // EXPLAIN is called here to work SELECT FOUND_ROWS()
 			if ($this->explain && $event->type === Event::SELECT) {
+				$backup = [$connection->onEvent, \dibi::$numOfQueries, \dibi::$totalTime];
+				$connection->onEvent = null;
+				$cmd = is_string($this->explain) ? $this->explain : ($connection->getConfig('driver') === 'oracle' ? 'EXPLAIN PLAN FOR' : 'EXPLAIN');
 				try {
-					$backup = [$connection->onEvent, \dibi::$numOfQueries, \dibi::$totalTime];
-					$connection->onEvent = null;
-					$cmd = is_string($this->explain) ? $this->explain : ($connection->getConfig('driver') === 'oracle' ? 'EXPLAIN PLAN FOR' : 'EXPLAIN');
 					$explain = @Helpers::dump($connection->nativeQuery("$cmd $event->sql"), true);
 				} catch (Dibi\Exception $e) {
 				}

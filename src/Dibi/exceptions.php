@@ -1,7 +1,7 @@
 <?php
 
 /**
- * This file is part of the "dibi" - smart database abstraction layer.
+ * This file is part of the Dibi, smart database abstraction layer (https://dibiphp.com)
  * Copyright (c) 2005 David Grudl (https://davidgrudl.com)
  */
 
@@ -11,7 +11,7 @@ namespace Dibi;
 
 
 /**
- * dibi common exception.
+ * Dibi common exception.
  */
 class Exception extends \Exception
 {
@@ -20,7 +20,7 @@ class Exception extends \Exception
 
 
 	/**
-	 * Construct a dibi exception.
+	 * @param  int|string  $code
 	 */
 	public function __construct(string $message = '', $code = 0, string $sql = null, \Throwable $previous = null)
 	{
@@ -93,7 +93,7 @@ class ProcedureException extends Exception
 	/**
 	 * Construct the exception.
 	 */
-	public function __construct(string $message = null, int $code = 0, string $severity = null, $sql = null)
+	public function __construct(string $message = '', int $code = 0, string $severity = '', string $sql = null)
 	{
 		parent::__construct($message, $code, $sql);
 		$this->severity = $severity;
@@ -105,7 +105,7 @@ class ProcedureException extends Exception
 	 */
 	public function getSeverity(): string
 	{
-		$this->severity;
+		return $this->severity;
 	}
 }
 

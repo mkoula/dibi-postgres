@@ -1,7 +1,7 @@
 <?php
 
 /**
- * This file is part of the "dibi" - smart database abstraction layer.
+ * This file is part of the Dibi, smart database abstraction layer (https://dibiphp.com)
  * Copyright (c) 2005 David Grudl (https://davidgrudl.com)
  */
 
@@ -11,7 +11,7 @@ namespace Dibi;
 
 
 /**
- * dibi SQL translator.
+ * SQL translator.
  */
 final class Translator
 {
@@ -41,10 +41,10 @@ final class Translator
 	/** @var int */
 	private $ifLevelStart = 0;
 
-	/** @var int */
+	/** @var int|null */
 	private $limit;
 
-	/** @var int */
+	/** @var int|null */
 	private $offset;
 
 	/** @var HashMap */
@@ -70,6 +70,7 @@ final class Translator
 			$args = array_values($args[0]);
 		}
 		$this->args = $args;
+		$this->errors = [];
 
 		$commandIns = null;
 		$lastArr = null;
@@ -167,7 +168,7 @@ final class Translator
 
 	/**
 	 * Apply modifier to single value.
-	 * @param  mixed
+	 * @param  mixed  $value
 	 */
 	public function formatValue($value, ?string $modifier): string
 	{
@@ -347,7 +348,11 @@ final class Translator
 		if ($modifier) {
 			if ($value !== null && !is_scalar($value)) {  // array is already processed
 				if ($value instanceof Literal && ($modifier === 'sql' || $modifier === 'SQL')) {
-					$modifier = 'SQL';
+					return (string) $value;
+
+				} elseif ($value instanceof Expression && $modifier === 'ex') {
+					return $this->connection->translate(...$value->getValues());
+
 				} elseif ($value instanceof \DateTimeInterface && ($modifier === 'd' || $modifier === 't' || $modifier === 'dt')) {
 					// continue
 				} else {
@@ -364,7 +369,7 @@ final class Translator
 					return $value === null ? 'NULL' : $this->driver->escapeBinary($value);
 
 				case 'b':  // boolean
-					return $value === null ? 'NULL' : $this->driver->escapeBool($value);
+					return $value === null ? 'NULL' : $this->driver->escapeBool((bool) $value);
 
 				case 'sN': // string or null
 				case 'sn':

@@ -1,7 +1,7 @@
 <?php
 
 /**
- * This file is part of the "dibi" - smart database abstraction layer.
+ * This file is part of the Dibi, smart database abstraction layer (https://dibiphp.com)
  * Copyright (c) 2005 David Grudl (https://davidgrudl.com)
  */
 
@@ -11,7 +11,7 @@ namespace Dibi;
 
 
 /**
- * Default implementation of IDataSource for dibi.
+ * Default implementation of IDataSource.
  */
 class DataSource implements IDataSource
 {
@@ -23,13 +23,13 @@ class DataSource implements IDataSource
 	/** @var string */
 	private $sql;
 
-	/** @var Result */
+	/** @var Result|null */
 	private $result;
 
-	/** @var int */
+	/** @var int|null */
 	private $count;
 
-	/** @var int */
+	/** @var int|null */
 	private $totalCount;
 
 	/** @var array */
@@ -49,7 +49,7 @@ class DataSource implements IDataSource
 
 
 	/**
-	 * @param  string  SQL command or table or view name, as data source
+	 * @param  string  $sql  command or table or view name, as data source
 	 */
 	public function __construct(string $sql, Connection $connection)
 	{
@@ -64,8 +64,8 @@ class DataSource implements IDataSource
 
 	/**
 	 * Selects columns to query.
-	 * @param  string|array  column name or array of column names
-	 * @param  string        column alias
+	 * @param  string|array  $col  column name or array of column names
+	 * @param  string  $as        column alias
 	 */
 	public function select($col, string $as = null): self
 	{
@@ -97,7 +97,7 @@ class DataSource implements IDataSource
 
 	/**
 	 * Selects columns to order by.
-	 * @param  string|array  column name or array of column names
+	 * @param  string|array  $row  column name or array of column names
 	 */
 	public function orderBy($row, string $direction = 'ASC'): self
 	{
@@ -123,9 +123,6 @@ class DataSource implements IDataSource
 	}
 
 
-	/**
-	 * Returns the dibi connection.
-	 */
 	final public function getConnection(): Connection
 	{
 		return $this->connection;
@@ -155,9 +152,8 @@ class DataSource implements IDataSource
 
 	/**
 	 * Generates, executes SQL query and fetches the single row.
-	 * @return Row|NULL
 	 */
-	public function fetch()
+	public function fetch(): ?Row
 	{
 		return $this->getResult()->fetch();
 	}

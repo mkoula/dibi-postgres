@@ -1,7 +1,7 @@
 <?php
 
 /**
- * This file is part of the "dibi" - smart database abstraction layer.
+ * This file is part of the Dibi, smart database abstraction layer (https://dibiphp.com)
  * Copyright (c) 2005 David Grudl (https://davidgrudl.com)
  */
 
@@ -14,7 +14,7 @@ use Dibi\Helpers;
 
 
 /**
- * The dibi driver for Microsoft SQL Server and SQL Azure databases.
+ * The driver for Microsoft SQL Server and SQL Azure databases.
  *
  * Driver options:
  *   - host => the MS SQL server host name. It can also include a port number (hostname:port)
@@ -24,20 +24,13 @@ use Dibi\Helpers;
  *   - options (array) => connection options {@link https://msdn.microsoft.com/en-us/library/cc296161(SQL.90).aspx}
  *   - charset => character encoding to set (default is UTF-8)
  *   - resource (resource) => existing connection resource
- *   - lazy, profiler, result, substitutes, ... => see Dibi\Connection options
  */
-class SqlsrvDriver implements Dibi\Driver, Dibi\ResultDriver
+class SqlsrvDriver implements Dibi\Driver
 {
 	use Dibi\Strict;
 
-	/** @var resource|null */
+	/** @var resource */
 	private $connection;
-
-	/** @var resource|null */
-	private $resultSet;
-
-	/** @var bool */
-	private $autoFree = true;
 
 	/** @var int|null  Affected rows */
 	private $affectedRows;
@@ -49,20 +42,12 @@ class SqlsrvDriver implements Dibi\Driver, Dibi\ResultDriver
 	/**
 	 * @throws Dibi\NotSupportedException
 	 */
-	public function __construct()
+	public function __construct(array &$config)
 	{
 		if (!extension_loaded('sqlsrv')) {
 			throw new Dibi\NotSupportedException("PHP extension 'sqlsrv' is not loaded.");
 		}
-	}
 
-
-	/**
-	 * Connects to a database.
-	 * @throws Dibi\Exception
-	 */
-	public function connect(array &$config): void
-	{
 		Helpers::alias($config, 'options|UID', 'username');
 		Helpers::alias($config, 'options|PWD', 'password');
 		Helpers::alias($config, 'options|Database', 'database');
@@ -195,13 +180,11 @@ class SqlsrvDriver implements Dibi\Driver, Dibi\ResultDriver
 
 	/**
 	 * Result set driver factory.
-	 * @param  resource
+	 * @param  resource  $resource
 	 */
-	public function createResultDriver($resource): Dibi\ResultDriver
+	public function createResultDriver($resource): SqlsrvResult
 	{
-		$res = clone $this;
-		$res->resultSet = $resource;
-		return $res;
+		return new SqlsrvResult($resource);
 	}
 
 
@@ -237,7 +220,7 @@ class SqlsrvDriver implements Dibi\Driver, Dibi\ResultDriver
 
 
 	/**
-	 * @param  \DateTimeInterface|string|int
+	 * @param  \DateTimeInterface|string|int  $value
 	 */
 	public function escapeDate($value): string
 	{
@@ -249,7 +232,7 @@ class SqlsrvDriver implements Dibi\Driver, Dibi\ResultDriver
 
 
 	/**
-	 * @param  \DateTimeInterface|string|int
+	 * @param  \DateTimeInterface|string|int  $value
 	 */
 	public function escapeDateTime($value): string
 	{
@@ -267,15 +250,6 @@ class SqlsrvDriver implements Dibi\Driver, Dibi\ResultDriver
 	{
 		$value = strtr($value, ["'" => "''", '%' => '[%]', '_' => '[_]', '[' => '[[]']);
 		return ($pos <= 0 ? "'%" : "'") . $value . ($pos >= 0 ? "%'" : "'");
-	}
-
-
-	/**
-	 * Decodes data from result set.
-	 */
-	public function unescapeBinary(string $value): string
-	{
-		return $value;
 	}
 
 
@@ -302,83 +276,5 @@ class SqlsrvDriver implements Dibi\Driver, Dibi\ResultDriver
 			// requires ORDER BY, see https://technet.microsoft.com/en-us/library/gg699618(v=sql.110).aspx
 			$sql = sprintf('%s OFFSET %d ROWS', rtrim($sql), $offset);
 		}
-	}
-
-
-	/********************* result set ****************d*g**/
-
-
-	/**
-	 * Automatically frees the resources allocated for this result set.
-	 */
-	public function __destruct()
-	{
-		$this->autoFree && $this->getResultResource() && $this->free();
-	}
-
-
-	/**
-	 * Returns the number of rows in a result set.
-	 */
-	public function getRowCount(): int
-	{
-		throw new Dibi\NotSupportedException('Row count is not available for unbuffered queries.');
-	}
-
-
-	/**
-	 * Fetches the row at current position and moves the internal cursor to the next position.
-	 * @param  bool     true for associative array, false for numeric
-	 */
-	public function fetch(bool $assoc): ?array
-	{
-		return sqlsrv_fetch_array($this->resultSet, $assoc ? SQLSRV_FETCH_ASSOC : SQLSRV_FETCH_NUMERIC);
-	}
-
-
-	/**
-	 * Moves cursor position without fetching row.
-	 */
-	public function seek(int $row): bool
-	{
-		throw new Dibi\NotSupportedException('Cannot seek an unbuffered result set.');
-	}
-
-
-	/**
-	 * Frees the resources allocated for this result set.
-	 */
-	public function free(): void
-	{
-		sqlsrv_free_stmt($this->resultSet);
-		$this->resultSet = null;
-	}
-
-
-	/**
-	 * Returns metadata for all columns in a result set.
-	 */
-	public function getResultColumns(): array
-	{
-		$columns = [];
-		foreach ((array) sqlsrv_field_metadata($this->resultSet) as $fieldMetadata) {
-			$columns[] = [
-				'name' => $fieldMetadata['Name'],
-				'fullname' => $fieldMetadata['Name'],
-				'nativetype' => $fieldMetadata['Type'],
-			];
-		}
-		return $columns;
-	}
-
-
-	/**
-	 * Returns the result set resource.
-	 * @return resource|null
-	 */
-	public function getResultResource()
-	{
-		$this->autoFree = false;
-		return is_resource($this->resultSet) ? $this->resultSet : null;
 	}
 }

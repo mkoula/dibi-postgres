@@ -1,7 +1,7 @@
 <?php
 
 /**
- * This file is part of the "dibi" - smart database abstraction layer.
+ * This file is part of the Dibi, smart database abstraction layer (https://dibiphp.com)
  * Copyright (c) 2005 David Grudl (https://davidgrudl.com)
  */
 
@@ -13,7 +13,7 @@ use Dibi;
 
 
 /**
- * The dibi driver for Oracle database.
+ * The driver for Oracle database.
  *
  * Driver options:
  *   - database => the name of the local Oracle instance or the name of the entry in tnsnames.ora
@@ -24,20 +24,13 @@ use Dibi;
  *   - nativeDate => use native date format (defaults to true)
  *   - resource (resource) => existing connection resource
  *   - persistent => Creates persistent connections with oci_pconnect instead of oci_new_connect
- *   - lazy, profiler, result, substitutes, ... => see Dibi\Connection options
  */
-class OracleDriver implements Dibi\Driver, Dibi\ResultDriver, Dibi\Reflector
+class OracleDriver implements Dibi\Driver
 {
 	use Dibi\Strict;
 
-	/** @var resource|null */
+	/** @var resource */
 	private $connection;
-
-	/** @var resource|null */
-	private $resultSet;
-
-	/** @var bool */
-	private $autoFree = true;
 
 	/** @var bool */
 	private $autocommit = true;
@@ -52,20 +45,12 @@ class OracleDriver implements Dibi\Driver, Dibi\ResultDriver, Dibi\Reflector
 	/**
 	 * @throws Dibi\NotSupportedException
 	 */
-	public function __construct()
+	public function __construct(array &$config)
 	{
 		if (!extension_loaded('oci8')) {
 			throw new Dibi\NotSupportedException("PHP extension 'oci8' is not loaded.");
 		}
-	}
 
-
-	/**
-	 * Connects to a database.
-	 * @throws Dibi\Exception
-	 */
-	public function connect(array &$config): void
-	{
 		$foo = &$config['charset'];
 
 		if (isset($config['formatDate']) || isset($config['formatDateTime'])) {
@@ -215,19 +200,17 @@ class OracleDriver implements Dibi\Driver, Dibi\ResultDriver, Dibi\Reflector
 	 */
 	public function getReflector(): Dibi\Reflector
 	{
-		return $this;
+		return new OracleReflector($this);
 	}
 
 
 	/**
 	 * Result set driver factory.
-	 * @param  resource
+	 * @param  resource  $resource
 	 */
-	public function createResultDriver($resource): Dibi\ResultDriver
+	public function createResultDriver($resource): OracleResult
 	{
-		$res = clone $this;
-		$res->resultSet = $resource;
-		return $res;
+		return new OracleResult($resource);
 	}
 
 
@@ -263,7 +246,7 @@ class OracleDriver implements Dibi\Driver, Dibi\ResultDriver, Dibi\Reflector
 
 
 	/**
-	 * @param  \DateTimeInterface|string|int
+	 * @param  \DateTimeInterface|string|int  $value
 	 */
 	public function escapeDate($value): string
 	{
@@ -277,7 +260,7 @@ class OracleDriver implements Dibi\Driver, Dibi\ResultDriver, Dibi\Reflector
 
 
 	/**
-	 * @param  \DateTimeInterface|string|int
+	 * @param  \DateTimeInterface|string|int  $value
 	 */
 	public function escapeDateTime($value): string
 	{
@@ -302,15 +285,6 @@ class OracleDriver implements Dibi\Driver, Dibi\ResultDriver, Dibi\Reflector
 
 
 	/**
-	 * Decodes data from result set.
-	 */
-	public function unescapeBinary(string $value): string
-	{
-		return $value;
-	}
-
-
-	/**
 	 * Injects LIMIT/OFFSET to the SQL query.
 	 */
 	public function applyLimit(string &$sql, ?int $limit, ?int $offset): void
@@ -327,148 +301,5 @@ class OracleDriver implements Dibi\Driver, Dibi\ResultDriver, Dibi\Reflector
 		} elseif ($limit !== null) {
 			$sql = 'SELECT * FROM (' . $sql . ') WHERE ROWNUM <= ' . $limit;
 		}
-	}
-
-
-	/********************* result set ****************d*g**/
-
-
-	/**
-	 * Automatically frees the resources allocated for this result set.
-	 */
-	public function __destruct()
-	{
-		$this->autoFree && $this->getResultResource() && $this->free();
-	}
-
-
-	/**
-	 * Returns the number of rows in a result set.
-	 */
-	public function getRowCount(): int
-	{
-		throw new Dibi\NotSupportedException('Row count is not available for unbuffered queries.');
-	}
-
-
-	/**
-	 * Fetches the row at current position and moves the internal cursor to the next position.
-	 * @param  bool     true for associative array, false for numeric
-	 */
-	public function fetch(bool $assoc): ?array
-	{
-		return Dibi\Helpers::false2Null(oci_fetch_array($this->resultSet, ($assoc ? OCI_ASSOC : OCI_NUM) | OCI_RETURN_NULLS));
-	}
-
-
-	/**
-	 * Moves cursor position without fetching row.
-	 */
-	public function seek(int $row): bool
-	{
-		throw new Dibi\NotImplementedException;
-	}
-
-
-	/**
-	 * Frees the resources allocated for this result set.
-	 */
-	public function free(): void
-	{
-		oci_free_statement($this->resultSet);
-		$this->resultSet = null;
-	}
-
-
-	/**
-	 * Returns metadata for all columns in a result set.
-	 */
-	public function getResultColumns(): array
-	{
-		$count = oci_num_fields($this->resultSet);
-		$columns = [];
-		for ($i = 1; $i <= $count; $i++) {
-			$type = oci_field_type($this->resultSet, $i);
-			$columns[] = [
-				'name' => oci_field_name($this->resultSet, $i),
-				'table' => null,
-				'fullname' => oci_field_name($this->resultSet, $i),
-				'nativetype' => $type === 'NUMBER' && oci_field_scale($this->resultSet, $i) === 0 ? 'INTEGER' : $type,
-			];
-		}
-		return $columns;
-	}
-
-
-	/**
-	 * Returns the result set resource.
-	 * @return resource|null
-	 */
-	public function getResultResource()
-	{
-		$this->autoFree = false;
-		return is_resource($this->resultSet) ? $this->resultSet : null;
-	}
-
-
-	/********************* Dibi\Reflector ****************d*g**/
-
-
-	/**
-	 * Returns list of tables.
-	 */
-	public function getTables(): array
-	{
-		$res = $this->query('SELECT * FROM cat');
-		$tables = [];
-		while ($row = $res->fetch(false)) {
-			if ($row[1] === 'TABLE' || $row[1] === 'VIEW') {
-				$tables[] = [
-					'name' => $row[0],
-					'view' => $row[1] === 'VIEW',
-				];
-			}
-		}
-		return $tables;
-	}
-
-
-	/**
-	 * Returns metadata for all columns in a table.
-	 */
-	public function getColumns(string $table): array
-	{
-		$res = $this->query('SELECT * FROM "ALL_TAB_COLUMNS" WHERE "TABLE_NAME" = ' . $this->escapeText($table));
-		$columns = [];
-		while ($row = $res->fetch(true)) {
-			$columns[] = [
-				'table' => $row['TABLE_NAME'],
-				'name' => $row['COLUMN_NAME'],
-				'nativetype' => $row['DATA_TYPE'],
-				'size' => $row['DATA_LENGTH'] ?? null,
-				'nullable' => $row['NULLABLE'] === 'Y',
-				'default' => $row['DATA_DEFAULT'],
-				'vendor' => $row,
-			];
-		}
-		return $columns;
-	}
-
-
-	/**
-	 * Returns metadata for all indexes in a table.
-	 */
-	public function getIndexes(string $table): array
-	{
-		throw new Dibi\NotImplementedException;
-	}
-
-
-	/**
-	 * Returns metadata for all foreign keys in a table.
-	 */
-	public function getForeignKeys(string $table): array
-	{
-		throw new Dibi\NotImplementedException;
 	}
 }

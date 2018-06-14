@@ -1,7 +1,7 @@
 <?php
 
 /**
- * This file is part of the "dibi" - smart database abstraction layer.
+ * This file is part of the Dibi, smart database abstraction layer (https://dibiphp.com)
  * Copyright (c) 2005 David Grudl (https://davidgrudl.com)
  */
 
@@ -13,7 +13,7 @@ use Dibi;
 
 
 /**
- * The dibi driver interacting with databases via ODBC connections.
+ * The driver interacting with databases via ODBC connections.
  *
  * Driver options:
  *   - dsn => driver specific DSN
@@ -21,45 +21,27 @@ use Dibi;
  *   - password (or pass)
  *   - persistent (bool) => try to find a persistent link?
  *   - resource (resource) => existing connection resource
- *   - lazy, profiler, result, substitutes, ... => see Dibi\Connection options
  */
-class OdbcDriver implements Dibi\Driver, Dibi\ResultDriver, Dibi\Reflector
+class OdbcDriver implements Dibi\Driver
 {
 	use Dibi\Strict;
 
-	/** @var resource|null */
+	/** @var resource */
 	private $connection;
-
-	/** @var resource|null */
-	private $resultSet;
-
-	/** @var bool */
-	private $autoFree = true;
 
 	/** @var int|null  Affected rows */
 	private $affectedRows;
-
-	/** @var int  Cursor */
-	private $row = 0;
 
 
 	/**
 	 * @throws Dibi\NotSupportedException
 	 */
-	public function __construct()
+	public function __construct(array &$config)
 	{
 		if (!extension_loaded('odbc')) {
 			throw new Dibi\NotSupportedException("PHP extension 'odbc' is not loaded.");
 		}
-	}
 
-
-	/**
-	 * Connects to a database.
-	 * @throws Dibi\Exception
-	 */
-	public function connect(array &$config): void
-	{
 		if (isset($config['resource'])) {
 			$this->connection = $config['resource'];
 		} else {
@@ -192,19 +174,17 @@ class OdbcDriver implements Dibi\Driver, Dibi\ResultDriver, Dibi\Reflector
 	 */
 	public function getReflector(): Dibi\Reflector
 	{
-		return $this;
+		return new OdbcReflector($this);
 	}
 
 
 	/**
 	 * Result set driver factory.
-	 * @param  resource
+	 * @param  resource  $resource
 	 */
-	public function createResultDriver($resource): Dibi\ResultDriver
+	public function createResultDriver($resource): OdbcResult
 	{
-		$res = clone $this;
-		$res->resultSet = $resource;
-		return $res;
+		return new OdbcResult($resource);
 	}
 
 
@@ -239,7 +219,7 @@ class OdbcDriver implements Dibi\Driver, Dibi\ResultDriver, Dibi\Reflector
 
 
 	/**
-	 * @param  \DateTimeInterface|string|int
+	 * @param  \DateTimeInterface|string|int  $value
 	 */
 	public function escapeDate($value): string
 	{
@@ -251,7 +231,7 @@ class OdbcDriver implements Dibi\Driver, Dibi\ResultDriver, Dibi\Reflector
 
 
 	/**
-	 * @param  \DateTimeInterface|string|int
+	 * @param  \DateTimeInterface|string|int  $value
 	 */
 	public function escapeDateTime($value): string
 	{
@@ -273,15 +253,6 @@ class OdbcDriver implements Dibi\Driver, Dibi\ResultDriver, Dibi\Reflector
 
 
 	/**
-	 * Decodes data from result set.
-	 */
-	public function unescapeBinary(string $value): string
-	{
-		return $value;
-	}
-
-
-	/**
 	 * Injects LIMIT/OFFSET to the SQL query.
 	 */
 	public function applyLimit(string &$sql, ?int $limit, ?int $offset): void
@@ -295,165 +266,5 @@ class OdbcDriver implements Dibi\Driver, Dibi\ResultDriver, Dibi\Reflector
 		} elseif ($limit !== null) {
 			$sql = 'SELECT TOP ' . $limit . ' * FROM (' . $sql . ') t';
 		}
-	}
-
-
-	/********************* result set ****************d*g**/
-
-
-	/**
-	 * Automatically frees the resources allocated for this result set.
-	 */
-	public function __destruct()
-	{
-		$this->autoFree && $this->getResultResource() && $this->free();
-	}
-
-
-	/**
-	 * Returns the number of rows in a result set.
-	 */
-	public function getRowCount(): int
-	{
-		// will return -1 with many drivers :-(
-		return odbc_num_rows($this->resultSet);
-	}
-
-
-	/**
-	 * Fetches the row at current position and moves the internal cursor to the next position.
-	 * @param  bool     true for associative array, false for numeric
-	 */
-	public function fetch(bool $assoc): ?array
-	{
-		if ($assoc) {
-			return Dibi\Helpers::false2Null(odbc_fetch_array($this->resultSet, ++$this->row));
-		} else {
-			$set = $this->resultSet;
-			if (!odbc_fetch_row($set, ++$this->row)) {
-				return null;
-			}
-			$count = odbc_num_fields($set);
-			$cols = [];
-			for ($i = 1; $i <= $count; $i++) {
-				$cols[] = odbc_result($set, $i);
-			}
-			return $cols;
-		}
-	}
-
-
-	/**
-	 * Moves cursor position without fetching row.
-	 */
-	public function seek(int $row): bool
-	{
-		$this->row = $row;
-		return true;
-	}
-
-
-	/**
-	 * Frees the resources allocated for this result set.
-	 */
-	public function free(): void
-	{
-		odbc_free_result($this->resultSet);
-		$this->resultSet = null;
-	}
-
-
-	/**
-	 * Returns metadata for all columns in a result set.
-	 */
-	public function getResultColumns(): array
-	{
-		$count = odbc_num_fields($this->resultSet);
-		$columns = [];
-		for ($i = 1; $i <= $count; $i++) {
-			$columns[] = [
-				'name' => odbc_field_name($this->resultSet, $i),
-				'table' => null,
-				'fullname' => odbc_field_name($this->resultSet, $i),
-				'nativetype' => odbc_field_type($this->resultSet, $i),
-			];
-		}
-		return $columns;
-	}
-
-
-	/**
-	 * Returns the result set resource.
-	 * @return resource|null
-	 */
-	public function getResultResource()
-	{
-		$this->autoFree = false;
-		return is_resource($this->resultSet) ? $this->resultSet : null;
-	}
-
-
-	/********************* Dibi\Reflector ****************d*g**/
-
-
-	/**
-	 * Returns list of tables.
-	 */
-	public function getTables(): array
-	{
-		$res = odbc_tables($this->connection);
-		$tables = [];
-		while ($row = odbc_fetch_array($res)) {
-			if ($row['TABLE_TYPE'] === 'TABLE' || $row['TABLE_TYPE'] === 'VIEW') {
-				$tables[] = [
-					'name' => $row['TABLE_NAME'],
-					'view' => $row['TABLE_TYPE'] === 'VIEW',
-				];
-			}
-		}
-		odbc_free_result($res);
-		return $tables;
-	}
-
-
-	/**
-	 * Returns metadata for all columns in a table.
-	 */
-	public function getColumns(string $table): array
-	{
-		$res = odbc_columns($this->connection);
-		$columns = [];
-		while ($row = odbc_fetch_array($res)) {
-			if ($row['TABLE_NAME'] === $table) {
-				$columns[] = [
-					'name' => $row['COLUMN_NAME'],
-					'table' => $table,
-					'nativetype' => $row['TYPE_NAME'],
-					'size' => $row['COLUMN_SIZE'],
-					'nullable' => (bool) $row['NULLABLE'],
-					'default' => $row['COLUMN_DEF'],
-				];
-			}
-		}
-		odbc_free_result($res);
-		return $columns;
-	}
-
-
-	/**
-	 * Returns metadata for all indexes in a table.
-	 */
-	public function getIndexes(string $table): array
-	{
-		throw new Dibi\NotImplementedException;
-	}
-
-
-	/**
-	 * Returns metadata for all foreign keys in a table.
-	 */
-	public function getForeignKeys(string $table): array
-	{
-		throw new Dibi\NotImplementedException;
 	}
 }

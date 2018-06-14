@@ -1,7 +1,7 @@
 <?php
 
 /**
- * This file is part of the "dibi" - smart database abstraction layer.
+ * This file is part of the Dibi, smart database abstraction layer (https://dibiphp.com)
  * Copyright (c) 2005 David Grudl (https://davidgrudl.com)
  */
 
@@ -11,20 +11,7 @@ namespace Dibi;
 
 
 /**
- * dibi result set.
- *
- * <code>
- * $result = dibi::query('SELECT * FROM [table]');
- *
- * $row   = $result->fetch();
- * $value = $result->fetchSingle();
- * $table = $result->fetchAll();
- * $pairs = $result->fetchPairs();
- * $assoc = $result->fetchAssoc('col1');
- * $assoc = $result->fetchAssoc('col1[]col2->col3');
- *
- * unset($result);
- * </code>
+ * Query result.
  *
  * @property-read int $rowCount
  */
@@ -32,22 +19,22 @@ class Result implements IDataSource
 {
 	use Strict;
 
-	/** @var array  ResultDriver */
+	/** @var ResultDriver */
 	private $driver;
 
 	/** @var array  Translate table */
 	private $types = [];
 
-	/** @var Reflection\Result */
+	/** @var Reflection\Result|null */
 	private $meta;
 
 	/** @var bool  Already fetched? Used for allowance for first seek(0) */
 	private $fetched = false;
 
-	/** @var ?string  returned object class */
+	/** @var string|null  returned object class */
 	private $rowClass = Row::class;
 
-	/** @var callable  returned object factory*/
+	/** @var callable|null  returned object factory */
 	private $rowFactory;
 
 	/** @var array  format */
@@ -96,7 +83,7 @@ class Result implements IDataSource
 	 */
 	final public function seek(int $row): bool
 	{
-		return ($row !== 0 || $this->fetched) ? (bool) $this->getResultDriver()->seek($row) : true;
+		return ($row !== 0 || $this->fetched) ? $this->getResultDriver()->seek($row) : true;
 	}
 
 
@@ -124,6 +111,15 @@ class Result implements IDataSource
 	final public function getIterator(): ResultIterator
 	{
 		return new ResultIterator($this);
+	}
+
+
+	/**
+	 * Returns the number of columns in a result set.
+	 */
+	final public function getColumnCount(): int
+	{
+		return count($this->types);
 	}
 
 
@@ -162,7 +158,7 @@ class Result implements IDataSource
 	/**
 	 * Fetches the row at current position, process optional type conversion.
 	 * and moves the internal cursor to the next position
-	 * @return ?Row|array
+	 * @return Row|array|null
 	 */
 	final public function fetch()
 	{
@@ -199,7 +195,7 @@ class Result implements IDataSource
 
 	/**
 	 * Fetches all records from table.
-	 * @return Row[]
+	 * @return Row[]|array[]
 	 */
 	final public function fetchAll(int $offset = null, int $limit = null): array
 	{
@@ -303,7 +299,7 @@ class Result implements IDataSource
 	/**
 	 * @deprecated
 	 */
-	private function oldFetchAssoc($assoc)
+	private function oldFetchAssoc(string $assoc)
 	{
 		$this->seek(0);
 		$row = $this->fetch();
@@ -494,11 +490,13 @@ class Result implements IDataSource
 				$row[$key]->invert = (int) (bool) $m[1];
 
 			} elseif ($type === Type::BINARY) {
-				$row[$key] = $this->getResultDriver()->unescapeBinary($value);
+				$row[$key] = is_string($value) ? $this->getResultDriver()->unescapeBinary($value) : $value;
 			} elseif ($type === Type::ARRAY_TYPE) {
 				$row[$key] = Helpers::pgArrayParse($value);
-			} elseif ($type === Type::JSON || $type === Type::JSONB) {
-				$row[$key] = json_decode($value, TRUE);
+			} elseif ($type === Type::JSONB) {
+				$row[$key] = json_decode($value, true);
+			} elseif ($type === Type::JSON) {
+				$row[$key] = json_decode($value, true);
 			}
 		}
 	}
@@ -506,7 +504,7 @@ class Result implements IDataSource
 
 	/**
 	 * Define column type.
-	 * @param  string  $type use constant Type::*
+	 * @param  string  $type  use constant Type::*
 	 */
 	final public function setType(string $column, string $type): self
 	{
@@ -518,7 +516,7 @@ class Result implements IDataSource
 	/**
 	 * Returns column type.
 	 */
-	final public function getType($column): string
+	final public function getType(string $column): string
 	{
 		return $this->types[$column] ?? null;
 	}
@@ -537,7 +535,7 @@ class Result implements IDataSource
 	/**
 	 * Returns data format.
 	 */
-	final public function getFormat($type): ?string
+	final public function getFormat(string $type): ?string
 	{
 		return $this->formats[$type] ?? null;
 	}

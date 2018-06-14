@@ -14,7 +14,7 @@ require __DIR__ . '/bootstrap.php';
 $conn = new Dibi\Connection($config + ['formatDateTime' => "'Y-m-d H:i:s.u'", 'formatDate' => "'Y-m-d'"]);
 
 
-// dibi detects INSERT or REPLACE command & booleans
+// Dibi detects INSERT or REPLACE command & booleans
 Assert::same(
 	reformat("REPLACE INTO [products] ([title], [price]) VALUES ('Drticka', 318)"),
 	$conn->translate('REPLACE INTO [products]', [
@@ -48,7 +48,7 @@ Assert::same(
 );
 
 
-// dibi detects UPDATE command
+// Dibi detects UPDATE command
 Assert::same(
 	reformat("UPDATE [colors] SET [color]='blue', [order]=12 WHERE [id]=123"),
 	$conn->translate('UPDATE [colors] SET', [
@@ -183,7 +183,6 @@ if ($config['system'] === 'odbc') {
 Assert::same(
 	reformat([
 		'odbc' => 'INSERT INTO test ([a2], [a4], [b1], [b2], [b3], [b4], [b5], [b6], [b7], [b8], [b9], [c1]) VALUES (#09/26/1212 00:00:00.000000#, #12/31/1969 22:13:20.000000#, #09/26/1212#, #09/26/1212 00:00:00.000000#, #12/31/1969#, #12/31/1969 22:13:20.000000#, #09/26/1212 00:00:00.000000#, #09/26/1212#, #09/26/1212 00:00:00.000000#, NULL, NULL, #09/26/1212 16:51:34.012400#)',
-		'mssql' => "INSERT INTO test ([a2], [a4], [b1], [b2], [b3], [b4], [b5], [b6], [b7], [b8], [b9], [c1]) VALUES (CONVERT(DATETIME2(7), '1212-09-26 00:00:00.000000'), CONVERT(DATETIME2(7), '1969-12-31 22:13:20.000000'), '1212-09-26', CONVERT(DATETIME2(7), '1212-09-26 00:00:00.000000'), '1969-12-31', CONVERT(DATETIME2(7), '1969-12-31 22:13:20.000000'), CONVERT(DATETIME2(7), '1212-09-26 00:00:00.000000'), '1212-09-26', CONVERT(DATETIME2(7), '1212-09-26 00:00:00.000000'), NULL, NULL, CONVERT(DATETIME2(7), '1212-09-26 16:51:34.012400'))",
 		'sqlsrv' => "INSERT INTO test ([a2], [a4], [b1], [b2], [b3], [b4], [b5], [b6], [b7], [b8], [b9], [c1]) VALUES (CONVERT(DATETIME2(7), '1212-09-26 00:00:00.000000'), CONVERT(DATETIME2(7), '1969-12-31 22:13:20.000000'), '1212-09-26', CONVERT(DATETIME2(7), '1212-09-26 00:00:00.000000'), '1969-12-31', CONVERT(DATETIME2(7), '1969-12-31 22:13:20.000000'), CONVERT(DATETIME2(7), '1212-09-26 00:00:00.000000'), '1212-09-26', CONVERT(DATETIME2(7), '1212-09-26 00:00:00.000000'), NULL, NULL, CONVERT(DATETIME2(7), '1212-09-26 16:51:34.012400'))",
 		"INSERT INTO test ([a2], [a4], [b1], [b2], [b3], [b4], [b5], [b6], [b7], [b8], [b9], [c1]) VALUES ('1212-09-26 00:00:00.000000', '1969-12-31 22:13:20.000000', '1212-09-26', '1212-09-26 00:00:00.000000', '1969-12-31', '1969-12-31 22:13:20.000000', '1212-09-26 00:00:00.000000', '1212-09-26', '1212-09-26 00:00:00.000000', NULL, NULL, '1212-09-26 16:51:34.012400')",
 	]),
@@ -503,6 +502,18 @@ Assert::same(
 	$conn->translate('SELECT * FROM [products] WHERE', [
 		'product_id' => 1,
 		'title' => new Dibi\Expression('SHA1(%s)', 'Test product'),
+	])
+);
+
+
+Assert::same(
+	reformat('SELECT * FROM [table] WHERE (([left] = 1) OR ([top] = 2)) AND (number < 100)'),
+	$conn->translate('SELECT * FROM `table` WHERE %and', [
+		new Dibi\Expression('%or', [
+			'left' => 1,
+			'top' => 2,
+		]),
+		new Dibi\Expression('number < %i', 100),
 	])
 );
 

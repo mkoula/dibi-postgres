@@ -1,7 +1,7 @@
 <?php
 
 /**
- * This file is part of the "dibi" - smart database abstraction layer.
+ * This file is part of the Dibi, smart database abstraction layer (https://dibiphp.com)
  * Copyright (c) 2005 David Grudl (https://davidgrudl.com)
  */
 
@@ -15,7 +15,7 @@ use PDO;
 
 
 /**
- * The dibi driver for PDO.
+ * The driver for PDO.
  *
  * Driver options:
  *   - dsn => driver specific DSN
@@ -24,17 +24,13 @@ use PDO;
  *   - options (array) => driver specific options {@see PDO::__construct}
  *   - resource (PDO) => existing connection
  *   - version
- *   - lazy, profiler, result, substitutes, ... => see Dibi\Connection options
  */
-class PdoDriver implements Dibi\Driver, Dibi\ResultDriver
+class PdoDriver implements Dibi\Driver
 {
 	use Dibi\Strict;
 
-	/** @var PDO  Connection resource */
+	/** @var PDO|null  Connection resource */
 	private $connection;
-
-	/** @var \PDOStatement|null  Resultset resource */
-	private $resultSet;
 
 	/** @var int|null  Affected rows */
 	private $affectedRows;
@@ -49,20 +45,12 @@ class PdoDriver implements Dibi\Driver, Dibi\ResultDriver
 	/**
 	 * @throws Dibi\NotSupportedException
 	 */
-	public function __construct()
+	public function __construct(array &$config)
 	{
 		if (!extension_loaded('pdo')) {
 			throw new Dibi\NotSupportedException("PHP extension 'pdo' is not loaded.");
 		}
-	}
 
-
-	/**
-	 * Connects to a database.
-	 * @throws Dibi\Exception
-	 */
-	public function connect(array &$config): void
-	{
 		$foo = &$config['dsn'];
 		$foo = &$config['options'];
 		Helpers::alias($config, 'resource', 'pdo');
@@ -101,22 +89,13 @@ class PdoDriver implements Dibi\Driver, Dibi\ResultDriver
 	 */
 	public function query(string $sql): ?Dibi\ResultDriver
 	{
-		// must detect if SQL returns result set or num of affected rows
-		$cmd = strtoupper(substr(ltrim($sql), 0, 6));
-		static $list = ['UPDATE' => 1, 'DELETE' => 1, 'INSERT' => 1, 'REPLAC' => 1];
-		$this->affectedRows = null;
-
-		if (isset($list[$cmd])) {
-			$this->affectedRows = Helpers::false2Null($this->connection->exec($sql));
-			if ($this->affectedRows !== null) {
-				return null;
-			}
-		} else {
-			$res = $this->connection->query($sql);
-			if ($res) {
-				return $this->createResultDriver($res);
-			}
+		$res = $this->connection->query($sql);
+		if ($res) {
+			$this->affectedRows = $res->rowCount();
+			return $res->columnCount() ? $this->createResultDriver($res) : null;
 		}
+
+		$this->affectedRows = null;
 
 		[$sqlState, $code, $message] = $this->connection->errorInfo();
 		$message = "SQLSTATE[$sqlState]: $message";
@@ -131,7 +110,7 @@ class PdoDriver implements Dibi\Driver, Dibi\ResultDriver
 				throw PostgreDriver::createException($message, $sqlState, $sql);
 
 			case 'sqlite':
-				throw Sqlite3Driver::createException($message, $code, $sql);
+				throw SqliteDriver::createException($message, $code, $sql);
 
 			default:
 				throw new Dibi\DriverException($message, $code, $sql);
@@ -153,7 +132,7 @@ class PdoDriver implements Dibi\Driver, Dibi\ResultDriver
 	 */
 	public function getInsertId(?string $sequence): ?int
 	{
-		return Helpers::false2Null($this->connection->lastInsertId());
+		return Helpers::intVal($this->connection->lastInsertId($sequence));
 	}
 
 
@@ -199,7 +178,7 @@ class PdoDriver implements Dibi\Driver, Dibi\ResultDriver
 	/**
 	 * Returns the connection resource.
 	 */
-	public function getResource(): PDO
+	public function getResource(): ?PDO
 	{
 		return $this->connection;
 	}
@@ -214,8 +193,19 @@ class PdoDriver implements Dibi\Driver, Dibi\ResultDriver
 			case 'mysql':
 				return new MySqlReflector($this);
 
+			case 'oci':
+				return new OracleReflector($this);
+
+			case 'pgsql':
+				return new PostgreReflector($this, $this->connection->getAttribute(PDO::ATTR_SERVER_VERSION));
+
 			case 'sqlite':
 				return new SqliteReflector($this);
+
+			case 'mssql':
+			case 'dblib':
+			case 'sqlsrv':
+				return new SqlsrvReflector($this);
 
 			default:
 				throw new Dibi\NotSupportedException;
@@ -226,11 +216,9 @@ class PdoDriver implements Dibi\Driver, Dibi\ResultDriver
 	/**
 	 * Result set driver factory.
 	 */
-	public function createResultDriver(\PDOStatement $resource): Dibi\ResultDriver
+	public function createResultDriver(\PDOStatement $result): PdoResult
 	{
-		$res = clone $this;
-		$res->resultSet = $resource;
-		return $res;
+		return new PdoResult($result, $this->driverName);
 	}
 
 
@@ -298,7 +286,7 @@ class PdoDriver implements Dibi\Driver, Dibi\ResultDriver
 
 
 	/**
-	 * @param  \DateTimeInterface|string|int
+	 * @param  \DateTimeInterface|string|int  $value
 	 */
 	public function escapeDate($value): string
 	{
@@ -310,7 +298,7 @@ class PdoDriver implements Dibi\Driver, Dibi\ResultDriver
 
 
 	/**
-	 * @param  \DateTimeInterface|string|int
+	 * @param  \DateTimeInterface|string|int  $value
 	 */
 	public function escapeDateTime($value): string
 	{
@@ -365,15 +353,6 @@ class PdoDriver implements Dibi\Driver, Dibi\ResultDriver
 			default:
 				throw new Dibi\NotImplementedException;
 		}
-	}
-
-
-	/**
-	 * Decodes data from result set.
-	 */
-	public function unescapeBinary(string $value): string
-	{
-		return $value;
 	}
 
 
@@ -450,85 +429,5 @@ class PdoDriver implements Dibi\Driver, Dibi\ResultDriver
 			default:
 				throw new Dibi\NotSupportedException('PDO or driver does not support applying limit or offset.');
 		}
-	}
-
-
-	/********************* result set ****************d*g**/
-
-
-	/**
-	 * Returns the number of rows in a result set.
-	 */
-	public function getRowCount(): int
-	{
-		return $this->resultSet->rowCount();
-	}
-
-
-	/**
-	 * Fetches the row at current position and moves the internal cursor to the next position.
-	 * @param  bool     true for associative array, false for numeric
-	 */
-	public function fetch(bool $assoc): ?array
-	{
-		return Helpers::false2Null($this->resultSet->fetch($assoc ? PDO::FETCH_ASSOC : PDO::FETCH_NUM));
-	}
-
-
-	/**
-	 * Moves cursor position without fetching row.
-	 */
-	public function seek(int $row): bool
-	{
-		throw new Dibi\NotSupportedException('Cannot seek an unbuffered result set.');
-	}
-
-
-	/**
-	 * Frees the resources allocated for this result set.
-	 */
-	public function free(): void
-	{
-		$this->resultSet = null;
-	}
-
-
-	/**
-	 * Returns metadata for all columns in a result set.
-	 * @throws Dibi\Exception
-	 */
-	public function getResultColumns(): array
-	{
-		$count = $this->resultSet->columnCount();
-		$columns = [];
-		for ($i = 0; $i < $count; $i++) {
-			$row = @$this->resultSet->getColumnMeta($i); // intentionally @
-			if ($row === false) {
-				throw new Dibi\NotSupportedException('Driver does not support meta data.');
-			}
-			$row = $row + [
-				'table' => null,
-				'native_type' => 'VAR_STRING',
-			];
-
-			$columns[] = [
-				'name' => $row['name'],
-				'table' => $row['table'],
-				'nativetype' => $row['native_type'],
-				'type' => $row['native_type'] === 'TIME' && $this->driverName === 'mysql' ? Dibi\Type::TIME_INTERVAL : null,
-				'fullname' => $row['table'] ? $row['table'] . '.' . $row['name'] : $row['name'],
-				'vendor' => $row,
-			];
-		}
-		return $columns;
-	}
-
-
-	/**
-	 * Returns the result set resource.
-	 */
-	public function getResultResource(): ?\PDOStatement
-	{
-		return $this->resultSet;
 	}
 }

@@ -3,21 +3,23 @@ declare(strict_types=1);
 ?>
 <!DOCTYPE html><link rel="stylesheet" href="data/style.css">
 
-<h1>Database Reflection | dibi</h1>
+<h1>Database Reflection | Dibi</h1>
 
 <?php
 
-require __DIR__ . '/../vendor/autoload.php';
+if (@!include __DIR__ . '/../vendor/autoload.php') {
+	die('Install packages using `composer install`');
+}
 
 
-dibi::connect([
-	'driver' => 'sqlite3',
+$dibi = new Dibi\Connection([
+	'driver' => 'sqlite',
 	'database' => 'data/sample.s3db',
 ]);
 
 
 // retrieve database reflection
-$database = dibi::getDatabaseInfo();
+$database = $dibi->getDatabaseInfo();
 
 echo "<h2>Database '{$database->getName()}'</h2>\n";
 echo "<ul>\n";

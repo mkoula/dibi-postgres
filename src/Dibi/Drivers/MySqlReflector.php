@@ -1,7 +1,7 @@
 <?php
 
 /**
- * This file is part of the "dibi" - smart database abstraction layer.
+ * This file is part of the Dibi, smart database abstraction layer (https://dibiphp.com)
  * Copyright (c) 2005 David Grudl (https://davidgrudl.com)
  */
 
@@ -13,7 +13,7 @@ use Dibi;
 
 
 /**
- * The dibi reflector for MySQL databases.
+ * The reflector for MySQL databases.
  * @internal
  */
 class MySqlReflector implements Dibi\Reflector
@@ -61,7 +61,6 @@ class MySqlReflector implements Dibi\Reflector
 				'table' => $table,
 				'nativetype' => strtoupper($type[0]),
 				'size' => isset($type[1]) ? (int) $type[1] : null,
-				'unsigned' => (bool) strstr($row['Type'], 'unsigned'),
 				'nullable' => $row['Null'] === 'YES',
 				'default' => $row['Default'],
 				'autoincrement' => $row['Extra'] === 'auto_increment',

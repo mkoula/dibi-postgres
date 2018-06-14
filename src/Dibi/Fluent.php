@@ -1,7 +1,7 @@
 <?php
 
 /**
- * This file is part of the "dibi" - smart database abstraction layer.
+ * This file is part of the Dibi, smart database abstraction layer (https://dibiphp.com)
  * Copyright (c) 2005 David Grudl (https://davidgrudl.com)
  */
 
@@ -13,11 +13,11 @@ use Dibi\Drivers\PostgreDriver;
 
 
 /**
- * dibi SQL builder via fluent interfaces. EXPERIMENTAL!
+ * SQL builder via fluent interfaces.
  *
  * @method Fluent select(...$field)
  * @method Fluent distinct()
- * @method Fluent from($table)
+ * @method Fluent from($table, ...$args = null)
  * @method Fluent where(...$cond)
  * @method Fluent groupBy(...$field)
  * @method Fluent having(...$cond)
@@ -93,7 +93,7 @@ class Fluent implements IDataSource
 	/** @var array */
 	private $setups = [];
 
-	/** @var string */
+	/** @var string|null */
 	private $command;
 
 	/** @var array */
@@ -102,7 +102,7 @@ class Fluent implements IDataSource
 	/** @var array */
 	private $flags = [];
 
-	/** @var array */
+	/** @var array|null */
 	private $cursor;
 
 	/** @var HashMap  normalized clauses */
@@ -271,15 +271,12 @@ class Fluent implements IDataSource
 	/**
 	 * Returns SQL command.
 	 */
-	final public function getCommand(): string
+	final public function getCommand(): ?string
 	{
 		return $this->command;
 	}
 
 
-	/**
-	 * Returns the dibi connection.
-	 */
 	final public function getConnection(): Connection
 	{
 		return $this->connection;
@@ -288,7 +285,6 @@ class Fluent implements IDataSource
 
 	/**
 	 * Adds Result setup.
-	 * @param  mixed   args
 	 */
 	public function setupResult(string $method): self
 	{
@@ -302,11 +298,10 @@ class Fluent implements IDataSource
 
 	/**
 	 * Generates and executes SQL query.
-	 * @param  mixed what to return?
-	 * @return Result|int  result set or number of affected rows
+	 * @return Result|int|null  result set or number of affected rows
 	 * @throws Exception
 	 */
-	public function execute($return = null)
+	public function execute(string $return = null)
 	{
 		$res = $this->query($this->_export());
 		switch ($return) {
@@ -322,7 +317,7 @@ class Fluent implements IDataSource
 
 	/**
 	 * Generates, executes SQL query and fetches the single row.
-	 * @return Row|NULL
+	 * @return Row|array|null
 	 */
 	public function fetch()
 	{
@@ -359,7 +354,7 @@ class Fluent implements IDataSource
 
 	/**
 	 * Fetches all records from table and returns associative tree.
-	 * @param  string  associative descriptor
+	 * @param  string  $assoc  associative descriptor
 	 */
 	public function fetchAssoc(string $assoc): array
 	{
@@ -369,7 +364,6 @@ class Fluent implements IDataSource
 
 	/**
 	 * Fetches all records from table like $key => $value pairs.
-	 * @param  string  associative key
 	 */
 	public function fetchPairs(string $key = null, string $value = null): array
 	{
@@ -388,7 +382,6 @@ class Fluent implements IDataSource
 
 	/**
 	 * Generates and prints SQL query or it's part.
-	 * @param  string clause name
 	 */
 	public function test(string $clause = null): bool
 	{
@@ -404,10 +397,7 @@ class Fluent implements IDataSource
 	}
 
 
-	/**
-	 * @return Result|int
-	 */
-	private function query($args)
+	private function query($args): Result
 	{
 		$res = $this->connection->query($args);
 		foreach ($this->setups as $setup) {
@@ -443,7 +433,6 @@ class Fluent implements IDataSource
 
 	/**
 	 * Generates parameters for Translator.
-	 * @param  string clause name
 	 */
 	protected function _export(string $clause = null, array $args = []): array
 	{

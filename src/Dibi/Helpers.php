@@ -1,7 +1,7 @@
 <?php
 
 /**
- * This file is part of the "dibi" - smart database abstraction layer.
+ * This file is part of the Dibi, smart database abstraction layer (https://dibiphp.com)
  * Copyright (c) 2005 David Grudl (https://davidgrudl.com)
  */
 
@@ -14,13 +14,13 @@ class Helpers
 {
 	use Strict;
 
-	/** @var array */
+	/** @var HashMap */
 	private static $types;
 
 
 	/**
 	 * Prints out a syntax highlighted version of the SQL command or Result.
-     * @param string|Result|null $sql
+     * @param string|Result $sql
      * @param bool $return
      * @return null|string
      */
@@ -91,7 +91,7 @@ class Helpers
 			$highlighter = "#(/\\*.+?\\*/)|(\\*\\*.+?\\*\\*)|(?<=[\\s,(])($keywords1)(?=[\\s,)])|(?<=[\\s,(=])($keywords2)(?=[\\s,)=])#is";
 			if (PHP_SAPI === 'cli') {
 				if (substr((string) getenv('TERM'), 0, 5) === 'xterm') {
-					$sql = preg_replace_callback($highlighter, function ($m) {
+					$sql = preg_replace_callback($highlighter, function (array $m) {
 						if (!empty($m[1])) { // comment
 							return "\033[1;30m" . $m[1] . "\033[0m";
 
@@ -110,7 +110,7 @@ class Helpers
 
 			} else {
 				$sql = htmlspecialchars($sql);
-				$sql = preg_replace_callback($highlighter, function ($m) {
+				$sql = preg_replace_callback($highlighter, function (array $m) {
 					if (!empty($m[1])) { // comment
 						return '<em style="color:gray">' . $m[1] . '</em>';
 
@@ -141,7 +141,7 @@ class Helpers
 	 * Finds the best suggestion.
 	 * @internal
 	 */
-	public static function getSuggestion(array $items, $value): ?string
+	public static function getSuggestion(array $items, string $value): ?string
 	{
 		$best = null;
 		$min = (strlen($value) / 4 + 1) * 10 + .1;
@@ -157,7 +157,7 @@ class Helpers
 
 
 	/** @internal */
-	public static function escape(Driver $driver, $value, $type)
+	public static function escape(Driver $driver, $value, string $type): string
 	{
 		static $types = [
 			Type::TEXT => 'text',
@@ -210,7 +210,7 @@ class Helpers
 	/**
 	 * @internal
 	 */
-	public static function getTypeCache()
+	public static function getTypeCache(): HashMap
 	{
 		if (self::$types === null) {
 			self::$types = new HashMap([__CLASS__, 'detectType']);
@@ -240,7 +240,7 @@ class Helpers
 	 * Import SQL dump from file.
 	 * @return int  count of sql commands
 	 */
-	public static function loadFromFile(Connection $connection, $file, callable $onProgress = null): int
+	public static function loadFromFile(Connection $connection, string $file, callable $onProgress = null): int
 	{
 		@set_time_limit(0); // intentionally @
 
@@ -291,27 +291,6 @@ class Helpers
 	{
 		return $val === false ? null : $val;
 	}
-
-
-    /**
-     * @internal
-     * @param $value
-     * @return string|int
-     * @throws Exception
-     */
-    public static function intVal($value): int
-    {
-        if (is_int($value)) {
-            return $value;
-        } elseif (is_string($value) && preg_match('#-?\d++\z#A', $value)) {
-            if (is_float($value * 1)) {
-                throw new Exception("Number $value is greater than integer.");
-            }
-            return (int) $value;
-        } else {
-            throw new Exception("Expected number, '$value' given.");
-        }
-    }
 
     /**
      * Parses PostgreSQL Array Type into PHP Array
@@ -473,4 +452,21 @@ class Helpers
         return '{' . implode(",", $result) . '}'; // PostgeSQL format
         //return 'ARRAY[' . implode(",", $result) . ']'; // ANSI format
     }
+
+	/**
+	 * @internal
+	 */
+	public static function intVal($value): int
+	{
+		if (is_int($value)) {
+			return $value;
+		} elseif (is_string($value) && preg_match('#-?\d++\z#A', $value)) {
+			if (is_float($value * 1)) {
+				throw new Exception("Number $value is greater than integer.");
+			}
+			return (int) $value;
+		} else {
+			throw new Exception("Expected number, '$value' given.");
+		}
+	}
 }
